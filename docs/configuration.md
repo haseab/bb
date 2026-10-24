@@ -1102,6 +1102,10 @@ server credential in its plugin KV (in `bb.db`); the builtin connect plugin
 holds the tunnel while the server runs. See the `bb-account` skill for signing
 in and the `share-server-links` skill for `bb connect` and port shares.
 
+Source development servers with `BB_DEV_APP_PORT` set route Connect traffic
+through the live Vite UI for local, staging, and production Cloud addresses.
+Packaged servers without this variable continue serving their built UI.
+
 | Connect setting          | Default | Effect                                                                                                                 |
 | ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `remoteAccess`           | `true`  | The Remote access switch; `false` closes the tunnel and machine shares without signing out. Also `bb connect off\|on`. |
