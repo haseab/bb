@@ -291,6 +291,7 @@ export type {
 
 export {
   appendDaemonEventsInTransaction,
+  syncNativeTurnEvents,
   appendStoredThreadEvent,
   copyStoredThreadEventsInTransaction,
   findLastCompletedRootStoredTurn,

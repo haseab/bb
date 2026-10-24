@@ -1157,6 +1157,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@bb/provider-bridge-protocol':
+        specifier: workspace:*
+        version: link:../../packages/provider-bridge-protocol
       '@bb/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -2795,6 +2798,9 @@ importers:
 
   packages/sdk:
     dependencies:
+      '@bb/provider-bridge-protocol':
+        specifier: workspace:*
+        version: link:../provider-bridge-protocol
       '@bb/config':
         specifier: workspace:*
         version: link:../config

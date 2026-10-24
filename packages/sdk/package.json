@@ -51,7 +51,8 @@
     "@bb/server-contract": "workspace:*",
     "@bb/templates": "workspace:*",
     "ws": "^8.19.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "@bb/provider-bridge-protocol": "workspace:*"
   },
   "devDependencies": {
     "@bb/tsconfig": "workspace:*",

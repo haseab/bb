@@ -1277,3 +1277,12 @@ metadata is preserved. This is a desktop-local preference, with no server
 settings CLI/SDK endpoint. Builds with tolerant readers ignore the field and
 may drop it on save; older strict readers can reject the whole file, so keep a
 backup before rolling back to a build predating the tolerant-reader fix #5286.
+
+### Codex conversation synchronization
+
+Settings → Providers → Codex → **Sync Codex conversations** controls automatic
+native conversation discovery and history refresh (default on). The plugin key
+is `provider-codex.syncConversations`; use
+`bb plugin config provider-codex set syncConversations false` to turn it off.
+`bb codex-sync sync --json` refreshes conversations through the same path used by
+the background service. Existing BB project directories determine discovery.

@@ -1,3 +1,5 @@
+import { CodexSessionReader } from "./session-reader.js";
+import { codexSessionHostContract } from "./session-sync-contract.js";
 import os from "node:os";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import {
@@ -22,6 +24,7 @@ export { experimental_providerBridge } from "./bridge/bridge.js";
 
 const codexHostContract = defineRpcContract({
   ...codexAiHostContract,
+  ...codexSessionHostContract,
   ...experimental_nativeRootsHostContract,
 });
 
@@ -33,9 +36,14 @@ async function textResult(work: Promise<string>): Promise<CodexAiTextResult> {
   }
 }
 
+const sessionReader = new CodexSessionReader();
+
 export default experimental_defineHostEntry({
+  dispose: () => sessionReader.dispose(),
   contract: codexHostContract,
   handlers: {
+    "sessions.list": (input) => sessionReader.list(input),
+    "sessions.read": (input) => sessionReader.read(input),
     resolveNativeRoots: (): Promise<ExperimentalNativeRootsResolveAnswer> =>
       resolveCodexNativeRoots({ homeDir: os.homedir(), env: process.env }),
     "codex.ai.complete": (input, context) =>

@@ -1250,6 +1250,16 @@ export function createPluginApi(options: {
   };
 
   const providers: PluginProviders = {
+    internal_DO_NOT_USE_syncNativeSession(snapshot) {
+      assertLive();
+      const sdk = getSdk();
+      if (pluginId !== "provider-codex" || !activated || !sdk) {
+        throw new Error(
+          "Native session ingestion is reserved for the active Codex provider",
+        );
+      }
+      return sdk.threads.experimental_syncNativeSession(snapshot);
+    },
     register: providerRegistrations.register,
     experimental_contributeEnv(providerId, resolve) {
       assertLive();

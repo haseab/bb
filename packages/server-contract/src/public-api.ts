@@ -1,4 +1,9 @@
 import {
+  nativeSessionSnapshotSchema,
+  type NativeSessionSnapshot,
+  type NativeSessionSyncResult,
+} from "@bb/provider-bridge-protocol";
+import {
   uiPreferencesRoute,
   updateUiPreferenceRoute,
   resetUiPreferenceRoute,
@@ -1354,6 +1359,14 @@ export const publicApiRoutes = {
   },
 
   threads: {
+    syncNativeSession: defineRoute({
+      path: "/threads/native-session",
+      method: "post",
+      request: jsonRequest<EmptyInput, NativeSessionSnapshot>(
+        nativeSessionSnapshotSchema,
+      ),
+      response: jsonResponse<NativeSessionSyncResult>(),
+    }),
     list: defineRoute({
       path: "/threads",
       method: "get",

@@ -487,12 +487,13 @@ export function parseProviderUserMessage(
   ) {
     return null;
   }
-  const text = decoded.item.content
-    .flatMap((part) => (part.type === "text" ? [part.text] : []))
-    .join("");
-  if (text.length === 0) {
-    return null;
-  }
+  const external = decoded.item.origin === "external";
+  const input: PromptInput[] = decoded.item.content.map((part) =>
+    part.type === "text" ? { ...part, mentions: [] } : part,
+  );
+  const parsedInput = parsePromptInput(input);
+  if (!parsedInput || (!external && parsedInput.text.length === 0)) return null;
+  const text = parsedInput.text;
   return {
     kind: "user",
     id: messageId(decoded.threadId, "provider-input", decoded.item.id),
@@ -506,13 +507,18 @@ export function parseProviderUserMessage(
     ...(decoded.item.parentToolCallId
       ? { parentToolCallId: decoded.item.parentToolCallId }
       : {}),
-    initiator: "system",
+    initiator: external ? "user" : "system",
     senderThreadId: null,
     systemMessageKind: "unlabeled",
     systemMessageSubject: null,
-    turnRequest: { isGrouped: false, kind: "steer", status: "accepted" },
+    turnRequest: {
+      isGrouped: false,
+      kind: external ? "message" : "steer",
+      status: "accepted",
+    },
     text,
     mentions: [],
+    ...(external ? { attachments: buildAttachments(parsedInput) } : {}),
   };
 }
 

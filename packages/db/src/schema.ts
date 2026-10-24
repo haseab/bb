@@ -1367,3 +1367,37 @@ export const projectAttachmentBackfills = sqliteTable(
     error: text("error"),
   },
 );
+
+export const nativeSessionLinks = sqliteTable(
+  "native_session_links",
+  {
+    hostId: text("host_id")
+      .notNull()
+      .references(() => hosts.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull(),
+    providerThreadId: text("provider_thread_id").notNull(),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => threads.id, { onDelete: "cascade" }),
+    active: integer("active", { mode: "boolean" }).notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.hostId, table.providerId, table.providerThreadId],
+    }),
+    uniqueIndex("native_session_links_thread_idx").on(table.threadId),
+  ],
+);
+
+export const nativeSessionTurns = sqliteTable(
+  "native_session_turns",
+  {
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => threads.id, { onDelete: "cascade" }),
+    providerTurnId: text("provider_turn_id").notNull(),
+    hash: text("hash").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.threadId, table.providerTurnId] })],
+);

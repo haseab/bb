@@ -43,6 +43,7 @@ import {
   THREAD_CONTEXT_CLEAR_OPERATION,
   clientTurnRequestIdSchema,
   getThreadEventScopeTurnId,
+  buildThreadEventRow,
   parseStoredThreadEvent,
   systemThreadInterruptedReasonSchema,
   threadEventTypeValues,
@@ -4401,4 +4402,126 @@ export function listOpenBackgroundTaskItemRowsForThread(
   return rows.flatMap((row) =>
     row.itemId === null ? [] : [{ ...row, itemId: row.itemId }],
   );
+}
+
+export function syncNativeTurnEvents(
+  db: DbTransaction,
+  args: {
+    threadId: string;
+    environmentId: string;
+    providerThreadId: string;
+    turnId: string;
+    createdAt: number;
+    completedAt: number | null;
+    snapshot: readonly ThreadEvent[];
+  },
+): boolean {
+  const eventKey = (
+    type: ThreadEventType,
+    itemId: string | null,
+    data: string,
+  ) =>
+    type === "provider/unhandled"
+      ? `${type}:${data}`
+      : `${type}:${itemId ?? ""}`;
+  const previous = db
+    .select()
+    .from(events)
+    .where(
+      and(eq(events.threadId, args.threadId), eq(events.turnId, args.turnId)),
+    )
+    .all();
+  const keyed = new Map(
+    previous.map((row) => [eventKey(row.type, row.itemId, row.data), row]),
+  );
+  const wanted = new Set<string>();
+  let nextSequence =
+    (getHighWaterMarks(db, [args.threadId])[args.threadId] ?? 0) + 1;
+  let changed = false;
+  for (const event of args.snapshot) {
+    const fields = deriveStoredEventItemFieldsFromSource({
+      type: event.type,
+      item: "item" in event ? event.item : undefined,
+    });
+    const row = buildThreadEventRow({
+      id: "",
+      scope: event.scope,
+      threadId: args.threadId,
+      seq: 0,
+      createdAt: args.createdAt,
+      event,
+    });
+    const data = JSON.stringify(row.data);
+    const key = eventKey(event.type, fields.itemId, data);
+    if (wanted.has(key)) continue;
+    wanted.add(key);
+    const existing = keyed.get(key);
+    const createdAt =
+      event.type === "turn/completed"
+        ? (args.completedAt ?? args.createdAt)
+        : args.createdAt;
+    if (existing?.data === data && existing.createdAt === createdAt) continue;
+    const sequence = existing?.sequence ?? nextSequence++;
+    if (existing) db.delete(events).where(eq(events.id, existing.id)).run();
+    insertStoredEventRow(db, {
+      attachmentOwnership: "required",
+      conflict: "error",
+      createdAt,
+      data,
+      environmentId: args.environmentId,
+      ...fields,
+      providerThreadId: args.providerThreadId,
+      scopeKind: event.scope.kind,
+      sequence,
+      threadId: args.threadId,
+      turnId: args.turnId,
+      type: event.type,
+    });
+    db.delete(threadSearchSegments)
+      .where(
+        and(
+          eq(threadSearchSegments.threadId, args.threadId),
+          eq(threadSearchSegments.sourceSeq, sequence),
+        ),
+      )
+      .run();
+    const segments = listThreadSearchSegmentsForThreadEvent({
+      event,
+      sequence,
+    });
+    if (event.type === "item/completed" && event.item.type === "userMessage") {
+      segments.push(
+        ...buildThreadEventSearchSegment({
+          threadId: args.threadId,
+          sequence,
+          sourceKind: "user_message",
+          text: event.item.content
+            .flatMap((content) =>
+              content.type === "text" ? [content.text] : [],
+            )
+            .join("\n"),
+        }),
+      );
+    }
+    upsertThreadSearchSegments(db, { updatedAt: Date.now(), segments });
+    changed = true;
+  }
+  for (const row of previous) {
+    if (wanted.has(eventKey(row.type, row.itemId, row.data))) continue;
+    db.delete(events).where(eq(events.id, row.id)).run();
+    db.delete(threadSearchSegments)
+      .where(
+        and(
+          eq(threadSearchSegments.threadId, args.threadId),
+          eq(threadSearchSegments.sourceSeq, row.sequence),
+        ),
+      )
+      .run();
+    changed = true;
+  }
+  if (changed) {
+    bumpThreadEventRewriteGeneration(args.threadId);
+    markThreadPruningWork(db, [args.threadId]);
+  }
+  return changed;
 }

@@ -1,3 +1,6 @@
+import { and, eq, inArray } from "drizzle-orm";
+import { nativeSessionLinks } from "@bb/db";
+import { isNativeSessionActive } from "./native-session-sync.js";
 import {
   getEnvironment,
   getSessionById,
@@ -87,6 +90,7 @@ interface ToThreadListEntryResponsesArgs {
 }
 
 interface ToThreadListEntryResponseFromLatestSessionArgs {
+  nativeActive: boolean;
   activity: ThreadActivityState;
   hostConnected: boolean;
   latestClosedSession: HostDaemonSessionRow | null;
@@ -320,11 +324,14 @@ function toThreadResponseWithHost(
   const thread = toPublicThread(args.thread);
   return {
     ...thread,
-    runtime: resolveThreadRuntimeState(deps, {
-      environmentHostId: args.environmentHostId,
-      now: args.now,
-      status: thread.status,
-    }),
+    runtime:
+      thread.status === "idle" && isNativeSessionActive(deps.db, thread.id)
+        ? { displayStatus: "active" }
+        : resolveThreadRuntimeState(deps, {
+            environmentHostId: args.environmentHostId,
+            now: args.now,
+            status: thread.status,
+          }),
   };
 }
 
@@ -558,8 +565,28 @@ export function toThreadListEntryResponses(
     deps,
     args.threads,
   );
+  const nativeActiveIds =
+    args.threads.length === 0
+      ? new Set<string>()
+      : new Set(
+          deps.db
+            .select({ threadId: nativeSessionLinks.threadId })
+            .from(nativeSessionLinks)
+            .where(
+              and(
+                eq(nativeSessionLinks.active, true),
+                inArray(
+                  nativeSessionLinks.threadId,
+                  args.threads.map((thread) => thread.id),
+                ),
+              ),
+            )
+            .all()
+            .map((row) => row.threadId),
+        );
   return args.threads.map((thread) => {
     const entry = toThreadListEntryResponseFromLatestSession({
+      nativeActive: nativeActiveIds.has(thread.id),
       activity: activityByThreadId.get(thread.id) ?? EMPTY_THREAD_ACTIVITY,
       queuedWork: queuedWorkByThreadId.get(thread.id) ?? "none",
       hostConnected:
@@ -602,12 +629,15 @@ function toThreadListEntryResponseFromLatestSession(
       isWorktree: args.thread.environmentIsWorktree,
     }),
     hasPendingInteraction: args.thread.hasPendingInteraction,
-    runtime: resolveThreadRuntimeStateFromLatestSession({
-      environmentHostId: args.thread.environmentHostId,
-      hostConnected: args.hostConnected,
-      latestClosedSession: args.latestClosedSession,
-      now: args.now,
-      status: thread.status,
-    }),
+    runtime:
+      thread.status === "idle" && args.nativeActive
+        ? { displayStatus: "active" }
+        : resolveThreadRuntimeStateFromLatestSession({
+            environmentHostId: args.thread.environmentHostId,
+            hostConnected: args.hostConnected,
+            latestClosedSession: args.latestClosedSession,
+            now: args.now,
+            status: thread.status,
+          }),
   };
 }

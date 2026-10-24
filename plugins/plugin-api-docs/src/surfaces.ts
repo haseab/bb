@@ -696,6 +696,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "experimental_spawnPortableProcess",
           "experimental_killPortableProcess",
           "PluginProviders",
+          "PluginProviders.internal_DO_NOT_USE_syncNativeSession",
+          "threads.experimental_syncNativeSession",
+          "experimental_nativeSessionSnapshotSchema",
+          "ExperimentalNativeSessionSnapshot",
+          "ExperimentalNativeSessionSyncResult",
         ],
         firstParty: [
           "ACP providers",
