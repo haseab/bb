@@ -2866,9 +2866,7 @@ export function PromptBoxInternal({
       popups,
     ],
   );
-  const showStop = Boolean(
-    isRunning && onStop && !canSubmit && !isAttaching && !showVoiceActionGroup,
-  );
+  const showStop = Boolean(isRunning && onStop && !showVoiceActionGroup);
   const canStartVoiceInput =
     voice !== undefined && voice.isSupported && !isSubmitting;
   const showVoiceAsPrimaryAction =
@@ -3137,6 +3135,10 @@ export function PromptBoxInternal({
           onEscape();
           return true;
         }
+        if (isRunning && onStop) {
+          onStop();
+          return true;
+        }
         blurPromptEditor(currentEditor);
         return true;
       }
@@ -3240,8 +3242,10 @@ export function PromptBoxInternal({
       handleComposerMenuKeyDown,
       history,
       isPointerCoarse,
+      isRunning,
       onEscape,
       onModifierSubmit,
+      onStop,
       postCompositionKeyDownEvents,
       resetHistorySession,
       selectedIndex,
@@ -3595,7 +3599,9 @@ export function PromptBoxInternal({
                           className="size-3.5 fill-current [&_*]:stroke-0"
                         />
                       </Button>
-                    ) : showVoiceAsPrimaryAction ? (
+                    ) : null}
+                    {showStop &&
+                    !canSubmit ? null : showVoiceAsPrimaryAction ? (
                       <VoiceInputButton
                         warning={voice?.microphoneWarning ?? null}
                         data-promptbox-submit-action=""

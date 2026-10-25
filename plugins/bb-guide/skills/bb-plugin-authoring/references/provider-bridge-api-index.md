@@ -6,6 +6,10 @@ Read the installed declarations for exact current signatures.
 
 ## `@get-bb/plugin-sdk/provider-bridge`
 
+- `experimental_nativeSessionSnapshotSchema` validates snapshots used by native conversation synchronization.
+- `ExperimentalNativeSessionSnapshot` describes a provider conversation snapshot.
+- `ExperimentalNativeSessionSyncResult` reports the BB thread mapping and synchronization status.
+
 - `contextSnapshotSchema`
 - `ContextSnapshot`
 - `ContextCategory`

@@ -2465,6 +2465,8 @@ Docs: `frontend-renderer-slots.md`, `testing.md`.
 paged/windowed read at 10k threads) and 5 (the draft indicator gap) cannot be
 resolved without one, and both change the contract.
 
+The optional `PluginSidebarThread.experimental_creationSource` reports `bb` or `native` from persisted thread provenance. The thread-list plugin uses it for origin tooltips and Codex icon tint. Stabilization requires import, continuation, and older-host coverage.
+
 The read hook returns the sidebar's live thread view (`PluginSidebarThread`
 DTOs with a host-resolved `indicator`, plus `sections`) from the host's own
 query and cache. The action hook is `@internal` and scheduled for removal

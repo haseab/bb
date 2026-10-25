@@ -1,3 +1,7 @@
+import {
+  projectBadgeLabel,
+  projectBadgeStyle,
+} from "@bb/shared-ui/project-identity";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useComposedRefs } from "@radix-ui/react-compose-refs";
 import { Button } from "@bb/shared-ui/button";
@@ -49,6 +53,7 @@ interface ProjectSelectorProps {
   disabled?: boolean;
   isLoading?: boolean;
   showChevronWhenDisabled?: boolean;
+  showProjectColor?: boolean;
   className?: string;
   defaultOpen?: boolean;
   modal?: boolean;
@@ -65,6 +70,7 @@ export function ProjectSelector({
   disabled: disabledProp = false,
   isLoading = false,
   showChevronWhenDisabled = false,
+  showProjectColor = false,
   className,
   defaultOpen,
   modal = true,
@@ -109,6 +115,7 @@ export function ProjectSelector({
     allProjectsValue !== undefined && value === allProjectsValue;
   const fallback =
     !allowNoProject && !allProjectsSelected && !selected ? projects[0] : null;
+  const colorProject = selected ?? fallback;
   const noProjectSelected = allowNoProject && value === null;
   const triggerLabel = isLoading
     ? "Loading projects…"
@@ -159,6 +166,14 @@ export function ProjectSelector({
           aria-busy={isLoading || undefined}
           disabled={disabled}
           data-promptbox-project-control=""
+          style={
+            showProjectColor && colorProject
+              ? {
+                  color: projectBadgeStyle(projectBadgeLabel(colorProject.name))
+                    .color,
+                }
+              : undefined
+          }
           className={cn(
             OPTION_BASE_CLASS_NAME,
             variant === "ghost" && !disabled && OPTION_INTERACTIVE_CLASS_NAME,

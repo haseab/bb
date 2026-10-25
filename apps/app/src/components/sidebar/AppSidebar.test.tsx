@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
 import { createStore, Provider } from "jotai";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SidebarThreadEntriesProvider } from "@/lib/sidebar-thread-entries";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompactViewportOverrideProvider } from "@bb/shared-ui/hooks/use-compact-viewport";
@@ -81,19 +83,26 @@ function Harness() {
 }
 
 function renderSidebar(preference: string, framed = false) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
   const store = createStore();
   store.set(sidebarNavigationProviderAtom, preference);
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={["/"]}>
-        <CompactViewportOverrideProvider isCompactViewport={false}>
-          <TooltipProvider>
-            <SidebarProvider framed={framed}>
-              <Harness />
-            </SidebarProvider>
-          </TooltipProvider>
-        </CompactViewportOverrideProvider>
-      </MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <SidebarThreadEntriesProvider navigation={undefined}>
+          <MemoryRouter initialEntries={["/"]}>
+            <CompactViewportOverrideProvider isCompactViewport={false}>
+              <TooltipProvider>
+                <SidebarProvider framed={framed}>
+                  <Harness />
+                </SidebarProvider>
+              </TooltipProvider>
+            </CompactViewportOverrideProvider>
+          </MemoryRouter>
+        </SidebarThreadEntriesProvider>
+      </QueryClientProvider>
     </Provider>,
   );
 }

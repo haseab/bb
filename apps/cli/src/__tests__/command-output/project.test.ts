@@ -396,6 +396,21 @@ describe("bb project command output", () => {
     );
   });
 
+  it("creates a named project without resolving a local machine", async () => {
+    const created = { id: "proj_research", name: "Research", sources: [] };
+    const post = vi.fn(async () => created);
+    stubServerApi({ "v1.projects.$post": post });
+    await runCommand(
+      ["project", "create", "--name", "Research", "--json"],
+      register,
+    );
+    expect(resolveLocalHostIdMock).not.toHaveBeenCalled();
+    expect(post).toHaveBeenCalledWith({ json: { name: "Research" } });
+    expect(
+      JSON.parse(String(vi.mocked(console.log).mock.calls[0]?.[0])),
+    ).toEqual(created);
+  });
+
   it("bb project create --json prints the created project", async () => {
     const created = {
       id: "proj-created",

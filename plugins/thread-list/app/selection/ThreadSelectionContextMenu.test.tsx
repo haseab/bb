@@ -87,7 +87,7 @@ it("moves selected roots while preserving descendants and detaching independentl
       "chronological",
     ),
   );
-  const move = await screen.findByRole("menuitem", { name: "Move to section" });
+  const move = await screen.findByRole("menuitem", { name: "Move to" });
   fireEvent.keyDown(move, { key: "ArrowRight" });
   fireEvent.click(await screen.findByRole("menuitem", { name: "Destination" }));
   await waitFor(() =>

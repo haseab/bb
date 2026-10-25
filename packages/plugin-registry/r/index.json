@@ -214,6 +214,10 @@
       "type": "registry:ui"
     },
     {
+      "name": "project-identity",
+      "type": "registry:ui"
+    },
+    {
       "name": "prompt-stack-disclosure",
       "type": "registry:ui"
     },
@@ -355,6 +359,10 @@
     },
     {
       "name": "thread-list-empty-state",
+      "type": "registry:ui"
+    },
+    {
+      "name": "thread-origin",
       "type": "registry:ui"
     },
     {

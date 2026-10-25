@@ -285,6 +285,7 @@ function makeThread(
   return {
     id,
     projectId: "project-1",
+    creationSource: "bb",
     environmentId: null,
     providerId: "codex",
     title: `Title ${id}`,
@@ -873,6 +874,33 @@ describe("CommandPalette", () => {
 
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("combobox")).toBeNull());
+  });
+
+  it("shows bb and Codex origins on recent and matching thread rows", async () => {
+    const native = makeThread("native", { creationSource: "native" });
+    const bb = makeThread("bb");
+    modeState.activeRecents = [native, bb];
+    renderPalette();
+    openThreadSearch();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Imported from Codex")).toBeTruthy(),
+    );
+    expect(screen.getByLabelText("Created in bb").textContent).toBe("bb");
+    expect(screen.getByLabelText("Imported from Codex").textContent).toBe(
+      "Codex",
+    );
+    modeState.searchResponse = {
+      active: {
+        total: 2,
+        results: [native, bb].map((thread) => ({ thread, matches: [] })),
+      },
+      archived: { total: 0, results: [] },
+    };
+    fireEvent.change(searchField(), { target: { value: "Title" } });
+    await waitFor(() =>
+      expect(screen.getByLabelText("Imported from Codex")).toBeTruthy(),
+    );
+    expect(screen.getByLabelText("Created in bb")).toBeTruthy();
   });
 
   it("uses the shared tab-pill clear affordance without running the mode command", async () => {

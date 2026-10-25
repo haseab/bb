@@ -39,6 +39,7 @@ export interface ThreadEntity {
 }
 
 const LIST_FACET: Record<ListFacetKey, true> = {
+  creationSource: true,
   activity: true,
   queuedWork: true,
   pinSortKey: true,

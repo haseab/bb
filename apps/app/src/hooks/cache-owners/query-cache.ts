@@ -471,6 +471,7 @@ export function optimisticallyInsertThread(
   const queuedWork = thread.queuedMessageCount > 0 ? "waiting" : "none";
   const insertedThread: ThreadListEntry = {
     ...thread,
+    creationSource: "bb",
     activity: {
       activeWorkflowCount: 0,
       activeBackgroundAgentCount: 0,

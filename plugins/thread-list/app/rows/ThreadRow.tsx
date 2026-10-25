@@ -1,4 +1,12 @@
 import {
+  BB_THREAD_ORIGIN_COLOR,
+  threadOrigin,
+} from "@/components/ui/thread-origin";
+import {
+  projectBadgeLabel,
+  projectBadgeStyle,
+} from "@/components/ui/project-identity";
+import {
   memo,
   createContext,
   useCallback,
@@ -394,18 +402,22 @@ function ThreadRowComponent({
   const projectName = useSidebarProjectName(thread.projectId);
   const projectBadge =
     organizationMode === "chronological" && projectName
-      ? projectName
-          .trim()
-          .split(/\s+/u)
-          .slice(0, 2)
-          .map((word) => Array.from(word)[0])
-          .join("")
-          .toLocaleUpperCase()
+      ? projectBadgeLabel(projectName)
       : null;
   const providers = useContext(SidebarProvidersContext);
   const provider = showProviderIcons
     ? providers.find((candidate) => candidate.id === thread.providerId)
     : undefined;
+  const origin = threadOrigin(
+    thread.experimental_creationSource,
+    thread.providerId,
+  );
+  const providerLabel = provider
+    ? `${provider.displayName} · ${origin.description}`
+    : origin.description;
+  const tintBbCodex =
+    thread.providerId === "codex" &&
+    thread.experimental_creationSource !== "native";
   const shortcut = useSidebarThreadShortcut(thread.id);
   const pluginThreadRowStatus = useSidebarThreadRowStatus(thread.id);
   const { hasUnsubmittedDraft: hasComposerDraft } = useSidebarThreadDraft(
@@ -563,6 +575,7 @@ function ThreadRowComponent({
   const rowClassName = cn(
     SIDEBAR_HOVER_ACTIONS_ROW_CLASS,
     "group/thread-row cursor-pointer",
+    "has-[[data-sidebar-thread-id]:focus]:ring-1 has-[[data-sidebar-thread-id]:focus]:ring-inset has-[[data-sidebar-thread-id]:focus]:ring-sidebar-ring",
     SIDEBAR_ROW_BASE_CLASS,
     LIST_HOVER_TRANSITION,
     parentOptions?.stickyLevel === undefined && "relative",
@@ -595,6 +608,17 @@ function ThreadRowComponent({
   );
 
   const rowLinkRef = useRef<HTMLAnchorElement>(null);
+  const pendingKeyboardOpen = useRef(false);
+  useEffect(() => {
+    if (!isActive || !pendingKeyboardOpen.current) return;
+    pendingKeyboardOpen.current = false;
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        rowLinkRef.current?.focus({ preventScroll: true });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isActive]);
   useEffect(() => {
     if (isCustomizingActions) {
       focusFirstRowActionSlot(
@@ -685,6 +709,25 @@ function ThreadRowComponent({
             }
             onProjectSelect?.();
           }}
+          onKeyDown={(event) => {
+            if (
+              event.key !== "Enter" ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.altKey ||
+              event.shiftKey ||
+              event.repeat ||
+              isEditing
+            )
+              return;
+            if (isActive) {
+              event.preventDefault();
+              event.stopPropagation();
+              startEditing();
+            } else {
+              pendingKeyboardOpen.current = true;
+            }
+          }}
           onDoubleClick={isEditing ? undefined : startTitleEditing}
           aria-label={linkLabel}
           aria-keyshortcuts={shortcut?.ariaKeyshortcuts}
@@ -705,7 +748,8 @@ function ThreadRowComponent({
                   data-sidebar-thread-project={thread.projectId}
                   role="img"
                   aria-label={`In project ${projectName}`}
-                  className="pointer-events-auto relative z-[31] mr-1.5 flex size-5 shrink-0 items-center justify-center rounded bg-muted text-xs font-medium text-muted-foreground"
+                  className="pointer-events-auto relative z-[31] mr-1.5 flex h-5 min-w-7 shrink-0 items-center justify-center rounded px-1 text-2xs font-medium"
+                  style={projectBadgeStyle(projectBadge)}
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -725,6 +769,13 @@ function ThreadRowComponent({
                   data-sidebar-thread-provider={provider.id}
                   role="img"
                   aria-label={provider.displayName}
+                  aria-description={origin.description}
+                  style={
+                    tintBbCodex ? { color: BB_THREAD_ORIGIN_COLOR } : undefined
+                  }
+                  data-thread-origin={
+                    thread.experimental_creationSource ?? "bb"
+                  }
                   className="pointer-events-auto relative z-[31] flex size-4 shrink-0 items-center justify-center mr-1.5 text-muted-foreground"
                   onClick={(event) => {
                     event.preventDefault();
@@ -734,12 +785,22 @@ function ThreadRowComponent({
                 >
                   <ProviderIcon
                     providerKind="agent"
-                    provider={provider}
+                    provider={
+                      tintBbCodex
+                        ? {
+                            ...provider,
+                            strings: {
+                              ...provider.strings,
+                              iconTint: undefined,
+                            },
+                          }
+                        : provider
+                    }
                     className="size-4"
                   />
                 </span>
               </TooltipTrigger>
-              <TooltipContent side="top">{provider.displayName}</TooltipContent>
+              <TooltipContent side="top">{providerLabel}</TooltipContent>
             </Tooltip>
           ) : null}
           {isEditing ? (

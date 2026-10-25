@@ -6,7 +6,11 @@ import type {
   ReasoningLevel,
   Thread,
 } from "@bb/domain";
-import { getEnvironment, getProjectSourceOnPersistentHost } from "@bb/db";
+import {
+  getEnvironment,
+  getProjectSourceOnPersistentHost,
+  listProjectSourcesForHost,
+} from "@bb/db";
 import { DEFAULT_ENVIRONMENT_PROVIDER_ID } from "../environments/environment-provider-ids.js";
 import { DEFAULT_SERVICE_TIER, PERSONAL_PROJECT_ID } from "@bb/domain";
 import type {
@@ -301,6 +305,16 @@ export async function resolveProjectDefaultThreadEnvironment(
   }
 
   const hostId = await resolveProjectDefaultHostId(deps, args.projectId);
+  if (listProjectSourcesForHost(deps.db, args.projectId, hostId).length !== 1) {
+    return {
+      type: "provider",
+      environmentProviderId: requireDefaultEnvironmentProvider(
+        DEFAULT_ENVIRONMENT_PROVIDER_ID.projectWorkspace,
+      ),
+      machine: { type: "existing", hostId },
+      inputs: null,
+    };
+  }
   const source = resolveProjectWorkspaceTarget(deps, {
     hostId,
     projectId: args.projectId,
@@ -383,6 +397,12 @@ export async function resolveCreateThreadEnvironment(
     );
     if (parentEnvironment === null) {
       throw new Error("Parent thread environment is missing");
+    }
+    if (
+      parentEnvironment.environmentProviderId ===
+      DEFAULT_ENVIRONMENT_PROVIDER_ID.projectWorkspace
+    ) {
+      return { type: "reuse", environmentId: parentEnvironment.id };
     }
     return {
       type: "provider",

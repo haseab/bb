@@ -68,7 +68,7 @@ bb settings completed-turns [provider-id] [collapse|flat|default]
 bb settings experiment <key> <value>
 bb settings usage [--machine <id-or-name>] [--refresh]
 bb settings cli-command [install|remove]
-bb settings version [--force]
+bb settings version [--force] [--json]
 bb settings reload Reload bb-managed configuration
 
 AI services: `bb settings ai-services` shows which AI service writes thread
@@ -235,6 +235,17 @@ every saved override; examples include `panel.previousTab` / `panel.nextTab`,
 unbound `panel.fullScreen.toggle`. `hints` (default true) shows or hides the
 delayed shortcut badges shown while holding the modifier key; shortcuts work
 either way.
+
+On macOS, `sidebar.focus` (`Mod+ArrowLeft`) focuses the last selected sidebar
+thread and opens the sidebar if needed; `chat.focus` (`Mod+ArrowRight`) restores
+chat focus or focuses the composer. These focus commands start unassigned on
+Windows/Linux. While a sidebar thread is focused, Up/Down moves its outlined
+selector without opening threads, and Enter opens it. Enter on the already open thread starts inline rename. `sidebar.archiveSelected`
+(`Mod+Backspace`) archives that selected thread through the normal archive flow
+and retains a neighboring selector. It does not run in text editors or chat.
+These commands are available in the palette, Settings → Keyboard, CLI keyboard
+settings, and SDK `system.updateKeyboardSettings` like other core commands.
+The thread-list plugin's movement shortcuts target this selector.
 
 `history.back` / `history.forward` (`Mod+[` / `Mod+]`) follow the pages opened
 in the current window, like the sidebar arrows. `thread.previous` /
@@ -426,3 +437,5 @@ metadata is preserved. This is a desktop-local preference, with no server
 settings CLI/SDK endpoint. Builds with tolerant readers ignore the field and
 may drop it on save; older strict readers can reject the whole file, so keep a
 backup before rolling back to a build predating the tolerant-reader fix #5286.
+
+The small sidebar version shows `v0.47` above a rebuild count such as `#12`. Only explicit rebuilds increment the count; dev edits, hot reloads, and launches do not. `pnpm desktop:package` counts once across its nested compilations. `bb settings version --json` and `sdk.system.version()` report the served frontend as `localBuildVersion` when its build metadata is available.

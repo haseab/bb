@@ -33,6 +33,40 @@ export function LocalFileLinks() {
   );
 }
 
+export function LinksAndInlineCode() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {(["light", "dark"] as const).map((theme) => (
+        <div
+          key={theme}
+          className={`${theme} rounded-lg bg-background p-6 text-foreground`}
+        >
+          <MarkdownPreview
+            content={[
+              "Manual requests can supply `startDate` and `endDate` to backfill a range.",
+              "See [range selection and fetching logic](/workspace/src/extract.ts:188) and [scripts/cron.ts (line 68)](/workspace/scripts/cron.ts:68).",
+              "Read the [extraction documentation](/workspace/README.md:41) or [external reference](https://example.com).",
+              "Links can also contain code: [`src/extract.ts`](/workspace/src/extract.ts).",
+              "A plain inline path also opens the file: `src/extract.ts:188`.",
+              "```ts\nconst startDate = new Date();\n```",
+            ].join("\n\n")}
+            linkRouting={{
+              localFile: {
+                absoluteLinks: { kind: "trusted-host" },
+                relativeLinks: {
+                  baseDir: "/workspace",
+                  rootPath: "/workspace",
+                },
+                onOpenLink: () => true,
+              },
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PreviewStage({ children }: { children: ReactNode }) {
   return (
     <div
@@ -51,7 +85,7 @@ const BASICS_MARKDOWN = `# Heading 1
 ### Heading 3
 
 A paragraph with **bold**, *italic*, ~~strikethrough~~, and \`inline code\`.
-Links render with an underline: [Anthropic](https://www.anthropic.com).
+Links render in blue with an underline on hover: [Anthropic](https://www.anthropic.com).
 
 > Block quotes carry a left rail and muted text for emphasis or pulled-out
 > commentary.

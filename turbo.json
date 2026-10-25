@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["BB_BUILD_TOOLCHAIN"],
+  "globalEnv": ["BB_BUILD_TOOLCHAIN", "BB_LOCAL_BUILD_VERSION"],
   "globalPassThroughEnv": ["npm_config_store_dir", "pnpm_config_store_dir"],
   "tasks": {
     "@bb/db#db:generate": { "cache": false },

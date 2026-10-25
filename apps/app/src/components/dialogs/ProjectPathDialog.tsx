@@ -38,6 +38,7 @@ export type ProjectPathDialogTarget =
       projectId: string;
       projectName: string;
       currentPath: string;
+      hostId?: string;
     }
   | {
       kind: "add-source";
@@ -112,9 +113,9 @@ function getDialogTitle(kind: ProjectPathDialogTarget["kind"]): string {
     case "create":
       return "Add project";
     case "update":
-      return "Update project path";
+      return "Change folder";
     case "add-source":
-      return "Add project source";
+      return "Add folder";
   }
 }
 
@@ -125,7 +126,7 @@ function getDialogSubmitLabel(kind: ProjectPathDialogTarget["kind"]): string {
     case "update":
       return "Save path";
     case "add-source":
-      return "Add source";
+      return "Add folder";
   }
 }
 
@@ -165,12 +166,15 @@ export function ProjectPathDialogContent({
   const inputId = useId();
   const isPointerCoarse = usePointerCoarse();
   const machineOptions =
-    target.kind === "create" ? selectHosts(hosts, "all") : undefined;
+    target.kind === "update" ? undefined : selectHosts(hosts, "all");
   const firstConnectedHostId = machineOptions?.find(
     (host) => host.status === "connected",
   )?.id;
   const [selectedHostIdState, setSelectedHostId] = useState(
-    hostId ?? firstConnectedHostId ?? null,
+    (target.kind === "update" ? target.hostId : null) ??
+      hostId ??
+      firstConnectedHostId ??
+      null,
   );
   const selectedHostId =
     machineOptions === undefined ||
@@ -179,7 +183,7 @@ export function ProjectPathDialogContent({
     )
       ? selectedHostIdState
       : (firstConnectedHostId ?? null);
-  const selectedHost = machineOptions?.find(
+  const selectedHost = (machineOptions ?? hosts)?.find(
     (host) => host.id === selectedHostId,
   );
   const selectedHostName = selectedHost?.name ?? hostName;

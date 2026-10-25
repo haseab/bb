@@ -76,6 +76,11 @@ describe("native Codex conversation synchronization", () => {
       expect(first.status).toBe("synced");
       const threadId = first.threadId!;
       expect(getThread(harness.db, threadId)?.createdAt).toBe(1000);
+      expect(getThread(harness.db, threadId)?.creationSource).toBe("native");
+      const search = await (
+        await harness.app.request("/api/v1/threads/search?query=Codex")
+      ).json();
+      expect(JSON.stringify(search)).toContain('"creationSource":"native"');
       const timeline = await (
         await harness.app.request(`/api/v1/threads/${threadId}/timeline`)
       ).json();
@@ -161,6 +166,7 @@ describe("native Codex conversation synchronization", () => {
           .all(),
       ).toHaveLength(count);
       expect(harness.db.select().from(threads).all()).toHaveLength(1);
+      expect(getThread(harness.db, thread.id)?.creationSource).toBe("bb");
     });
   });
 

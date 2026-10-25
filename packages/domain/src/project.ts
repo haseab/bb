@@ -50,8 +50,11 @@ export function findLocalPathProjectSourceForHost(
   sources: readonly ProjectSource[],
   hostId: string,
 ): LocalPathProjectSource | undefined {
-  return sources.find(
-    (source): source is LocalPathProjectSource =>
-      source.type === "local_path" && source.hostId === hostId,
+  const matches = sources.filter((source) => source.hostId === hostId);
+  return (
+    matches.find((source) => source.isDefault) ??
+    matches.sort(
+      (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
+    )[0]
   );
 }

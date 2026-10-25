@@ -191,6 +191,27 @@ export const DEFAULT_APP_KEYBINDINGS: AppDefaultKeybindings = [
   binding("app.back", "Escape", {}, mainWithoutModal),
   binding("settings.open", ",", { mod: true }, mainWithoutModal),
   binding("sidebar.toggle", "\\", { mod: true }, mainWithoutModal),
+  ...macArrowBindings(
+    "sidebar.focus",
+    "ArrowLeft",
+    { mod: true },
+    mainWithoutModalOrBrowser,
+  ),
+  ...macArrowBindings(
+    "chat.focus",
+    "ArrowRight",
+    { mod: true },
+    mainWithoutModalOrBrowser,
+  ),
+  binding(
+    "sidebar.archiveSelected",
+    "Backspace",
+    { mod: true },
+    {
+      ...mainWithoutModal,
+      none: ["modalOpen", "editableFocus", "terminalFocus", "browserFocus"],
+    },
+  ),
   unassignedBinding("notifications.open", mainWithoutModal),
   unassignedBinding("plugins.enterSafeMode", mainWithoutModal),
   unassignedBinding("plugins.exitSafeMode", mainWithoutModal),

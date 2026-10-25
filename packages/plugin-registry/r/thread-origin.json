@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "thread-origin",
+  "type": "registry:ui",
+  "title": "thread-origin",
+  "description": "BB ui \"thread-origin\" — vendored from the BB app's own source (version-matched to this BB release).",
+  "files": [
+    {
+      "path": "registry/components/ui/thread-origin.ts",
+      "content": "export const BB_THREAD_ORIGIN_TINT = {\n  light: \"oklch(from var(--ink) 0.48 0.2 300)\",\n  dark: \"oklch(from var(--ink) 0.76 0.16 300)\",\n};\nexport const BB_THREAD_ORIGIN_COLOR = `light-dark(${BB_THREAD_ORIGIN_TINT.light}, ${BB_THREAD_ORIGIN_TINT.dark})`;\n\nexport function threadOrigin(\n  creationSource: \"bb\" | \"native\" | undefined,\n  providerId: string,\n) {\n  if (creationSource === \"native\") {\n    const label = providerId === \"codex\" ? \"Codex\" : providerId;\n    return { label, description: `Imported from ${label}` };\n  }\n  return { label: \"bb\", description: \"Created in bb\" };\n}\n",
+      "type": "registry:ui",
+      "target": "components/ui/thread-origin.ts"
+    }
+  ]
+}

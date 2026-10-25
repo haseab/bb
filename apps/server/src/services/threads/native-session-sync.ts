@@ -112,6 +112,7 @@ export function syncNativeSession(
         projectId: project.id,
         environmentId: environment.id,
         providerId: snapshot.providerId,
+        creationSource: "native",
         title: snapshot.title,
         status: "idle",
       });

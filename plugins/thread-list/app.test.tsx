@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -14,7 +15,11 @@ import {
   renderSlot,
   type RenderSlotOptions,
 } from "@get-bb/plugin-sdk/testing/app";
-import { makePluginProject, makeSidebarThread } from "./app/model/fixtures.js";
+import {
+  makePluginProject,
+  makeSidebarThread,
+  sdkResult,
+} from "./app/model/fixtures.js";
 import {
   resetPreferencesSyncForTest,
   setPreferencesMirrorStorageForTest,
@@ -23,6 +28,8 @@ import {
   defaultPreferences,
   type PreferenceValues,
 } from "./shared/preferences.js";
+
+import { threadPipelineCommands } from "./app/pipeline/threadPipelineCommands.js";
 
 const app = await loadPluginApp(() => import("./app"));
 const registration = app.threadLists[0];
@@ -154,6 +161,118 @@ afterEach(() => {
 });
 
 describe("thread-list plugin", () => {
+  it.each([
+    ["section-up", "thr_parent", "sec_review"],
+    ["section-down", "thr_later", "sec_review"],
+  ])("%s moves %s to the adjacent section", async (id, threadId, sectionId) => {
+    setPreferencesMirrorStorageForTest(null);
+    const update = vi.fn(sdkResult({ ok: true }));
+    renderList(
+      { organizationMode: "chronological" },
+      { sdk: { threads: { update } } },
+    );
+    await screen.findByText("Parent thread");
+    const command = threadPipelineCommands.find(
+      (command) => command.id === id,
+    )!;
+    const context = { threadId, projectId: "proj_app", openPanel: () => false };
+    await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
+    await act(async () => command.run(context));
+    expect(update).toHaveBeenCalledWith({ threadId, sectionId });
+  });
+
+  it.each([
+    ["section-up", "thr_later"],
+    ["section-down", "thr_parent"],
+    ["order-up", "thr_parent"],
+  ])("%s stops at the boundary for %s", async (id, threadId) => {
+    setPreferencesMirrorStorageForTest(null);
+    const update = vi.fn(sdkResult({ ok: true }));
+    renderList(
+      { organizationMode: "chronological" },
+      { sdk: { threads: { update } } },
+    );
+    await screen.findByText("Parent thread");
+    const command = threadPipelineCommands.find(
+      (command) => command.id === id,
+    )!;
+    const context = { threadId, projectId: "proj_app", openPanel: () => false };
+    await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
+    await act(async () => command.run(context));
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("reorders siblings and saves manual order without moving their child separately", async () => {
+    setPreferencesMirrorStorageForTest(null);
+    const slot = renderList({
+      organizationMode: "chronological",
+      threadsSectionLabel: "Queued",
+    });
+    await screen.findByText("Parent thread");
+    const command = threadPipelineCommands.find(
+      (command) => command.id === "order-down",
+    )!;
+    const context = {
+      threadId: "thr_parent",
+      projectId: "proj_app",
+      openPanel: () => false,
+    };
+    await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
+    await act(async () => command.run(context));
+    expect(threadIds()).toEqual([
+      "thr_pinned",
+      "thr_later",
+      "thr_personal",
+      "thr_parent",
+      "thr_child",
+    ]);
+    expect(sectionHeaders()).toContain("Queued");
+    await waitFor(() =>
+      expect(slot.inspection.rpcCalls).toContainEqual({
+        method: "setPreference",
+        input: {
+          key: "manualThreadOrder",
+          value: ["thr_personal", "thr_parent"],
+        },
+      }),
+    );
+  });
+
+  it("restores manual ordering across status and attention changes", async () => {
+    setPreferencesMirrorStorageForTest(null);
+    renderList(
+      {
+        organizationMode: "chronological",
+        chronologicalSort: "manual",
+        manualThreadOrder: ["thr_personal", "thr_parent"],
+      },
+      {
+        sidebarThreads: {
+          projects: PROJECTS,
+          sections: SECTIONS,
+          threads: THREADS.map((thread) =>
+            thread.id === "thr_parent"
+              ? {
+                  ...thread,
+                  status: "active",
+                  latestAttentionAt: 999,
+                  updatedAt: 999,
+                }
+              : thread,
+          ),
+        },
+      },
+    );
+    await screen.findByText("Parent thread");
+    expect(threadIds()).toEqual([
+      "thr_pinned",
+      "thr_later",
+      "thr_personal",
+      "thr_parent",
+      "thr_child",
+    ]);
+  });
+
   it("shows the navigation skeleton until preferences load", () => {
     setPreferencesMirrorStorageForTest(null);
     renderSlot(registration, props(), {

@@ -10,6 +10,8 @@ import { useSidebarThreadReveal } from "./app/list/useSidebarThreadReveal.js";
 import { moveThreadAction } from "./app/rows/moveThreadAction.js";
 import { ThreadSelectionProvider } from "./app/selection/threadSelection.js";
 
+import { threadPipelineCommands } from "./app/pipeline/threadPipelineCommands.js";
+
 function ThreadList({
   activeThreadId,
   isCompactViewport,
@@ -32,6 +34,7 @@ function ThreadList({
 }
 
 export default definePluginApp((app) => {
+  for (const command of threadPipelineCommands) app.commands.register(command);
   app.slots.experimental_threadList({
     id: "thread-list",
     title: "Thread list",

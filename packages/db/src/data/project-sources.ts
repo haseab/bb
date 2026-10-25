@@ -1,5 +1,15 @@
 import { hostPathEquals } from "./host-path-sql.js";
-import { and, asc, count, desc, eq, inArray, isNull, ne, notInArray } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  notInArray,
+} from "drizzle-orm";
 import type { ProjectSource } from "@bb/domain";
 import type { DbConnection } from "../connection.js";
 import type { DbNotifier } from "../notifier.js";
@@ -94,10 +104,7 @@ export function listProjectSourcesByProjectIds(
     .map(toProjectSource);
 }
 
-export function listProjectSourcesByHost(
-  db: DbConnection,
-  hostId: string,
-) {
+export function listProjectSourcesByHost(db: DbConnection, hostId: string) {
   return db
     .select()
     .from(projectSources)
@@ -216,7 +223,56 @@ export function getProjectSourceByHost(
           eq(projectSources.hostId, hostId),
         ),
       )
+      .orderBy(
+        desc(projectSources.isDefault),
+        asc(projectSources.createdAt),
+        asc(projectSources.id),
+      )
+      .limit(1)
       .get() ?? null;
+  return source ? toProjectSource(source) : null;
+}
+
+export function listProjectSourcesForHost(
+  db: DbConnection,
+  projectId: string,
+  hostId: string,
+) {
+  return db
+    .select()
+    .from(projectSources)
+    .where(
+      and(
+        eq(projectSources.projectId, projectId),
+        eq(projectSources.hostId, hostId),
+      ),
+    )
+    .orderBy(
+      desc(projectSources.isDefault),
+      asc(projectSources.createdAt),
+      asc(projectSources.id),
+    )
+    .all()
+    .map(toProjectSource);
+}
+
+export function getProjectSourceByHostPath(
+  db: DbConnection,
+  projectId: string,
+  hostId: string,
+  path: string,
+) {
+  const source = db
+    .select()
+    .from(projectSources)
+    .where(
+      and(
+        eq(projectSources.projectId, projectId),
+        eq(projectSources.hostId, hostId),
+        hostPathEquals(projectSources.path, path),
+      ),
+    )
+    .get();
   return source ? toProjectSource(source) : null;
 }
 
@@ -294,9 +350,23 @@ export function deleteProjectSource(
   return true;
 }
 
-
-export function projectSourceOwnsPath(db: DbConnection, projectId: string, hostId: string, path: string): boolean {
-  return db.select({ ownsPath: projectSources.ownsPath }).from(projectSources).where(and(
-    eq(projectSources.projectId, projectId), eq(projectSources.hostId, hostId), hostPathEquals(projectSources.path, path),
-  )).get()?.ownsPath ?? false;
+export function projectSourceOwnsPath(
+  db: DbConnection,
+  projectId: string,
+  hostId: string,
+  path: string,
+): boolean {
+  return (
+    db
+      .select({ ownsPath: projectSources.ownsPath })
+      .from(projectSources)
+      .where(
+        and(
+          eq(projectSources.projectId, projectId),
+          eq(projectSources.hostId, hostId),
+          hostPathEquals(projectSources.path, path),
+        ),
+      )
+      .get()?.ownsPath ?? false
+  );
 }

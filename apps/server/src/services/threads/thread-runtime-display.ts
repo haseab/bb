@@ -1,8 +1,7 @@
-import { and, eq, inArray } from "drizzle-orm";
-import { nativeSessionLinks } from "@bb/db";
 import { isNativeSessionActive } from "./native-session-sync.js";
 import {
   getEnvironment,
+  listActiveNativeSessionThreadIds,
   getSessionById,
   listActiveBackgroundTaskCountsByThreadIds,
   listLatestClosedSessionsForHosts,
@@ -565,25 +564,12 @@ export function toThreadListEntryResponses(
     deps,
     args.threads,
   );
-  const nativeActiveIds =
-    args.threads.length === 0
-      ? new Set<string>()
-      : new Set(
-          deps.db
-            .select({ threadId: nativeSessionLinks.threadId })
-            .from(nativeSessionLinks)
-            .where(
-              and(
-                eq(nativeSessionLinks.active, true),
-                inArray(
-                  nativeSessionLinks.threadId,
-                  args.threads.map((thread) => thread.id),
-                ),
-              ),
-            )
-            .all()
-            .map((row) => row.threadId),
-        );
+  const nativeActiveIds = new Set(
+    listActiveNativeSessionThreadIds(
+      deps.db,
+      args.threads.map((thread) => thread.id),
+    ),
+  );
   return args.threads.map((thread) => {
     const entry = toThreadListEntryResponseFromLatestSession({
       nativeActive: nativeActiveIds.has(thread.id),
@@ -615,6 +601,7 @@ function toThreadListEntryResponseFromLatestSession(
   const thread = toPublicThread(args.thread);
   return {
     ...thread,
+    creationSource: args.thread.creationSource,
     activity: args.activity,
     queuedWork: args.queuedWork,
     pinSortKey: args.thread.pinSortKey,

@@ -504,9 +504,10 @@ export const projectSources = sqliteTable(
   (table) => [
     index("project_sources_project_idx").on(table.projectId),
     index("project_sources_host_idx").on(table.hostId),
-    uniqueIndex("project_sources_project_host_idx").on(
+    uniqueIndex("project_sources_project_host_path_idx").on(
       table.projectId,
       table.hostId,
+      table.path,
     ),
     check(
       "project_sources_shape_check",
@@ -603,6 +604,9 @@ export const threads = sqliteTable(
       onDelete: "set null",
     }),
     providerId: text("provider_id").notNull(),
+    creationSource: text("creation_source", { enum: ["bb", "native"] })
+      .notNull()
+      .default("bb"),
     modelOverride: text("model_override"),
     reasoningLevelOverride: text(
       "reasoning_level_override",

@@ -94,6 +94,8 @@ import {
   collapsedProjectIdsAtom,
   collapsedSidebarSectionIdsAtom,
   sidebarChronologicalSortAtom,
+  sidebarManualThreadOrderAtom,
+  sidebarThreadsSectionLabelAtom,
   sidebarGroupThreadsByEnvironmentAtom,
   sidebarSortDirectionAtom,
   sidebarCollapsedMachinesAtom,
@@ -127,6 +129,8 @@ import {
   useSidebarMachineHosts,
   type SidebarProject,
 } from "../model/use-sidebar-data.js";
+
+import { useThreadPipelineControls } from "../pipeline/useThreadPipelineControls.js";
 
 export interface ProjectListProps {
   activeThreadId: string | null;
@@ -297,7 +301,15 @@ export function getSidebarThreadComparator(
   sort: SidebarChronologicalSort,
   direction: SidebarSortDirection = "default",
   rename: ActiveRename = null,
+  manualOrder: readonly string[] = [],
 ): ThreadComparator {
+  if (sort === "manual") {
+    const positions = new Map(manualOrder.map((id, index) => [id, index]));
+    return (left, right) =>
+      (positions.get(left.id) ?? manualOrder.length) -
+        (positions.get(right.id) ?? manualOrder.length) ||
+      compareByCreatedAtDescending(left, right);
+  }
   const normalizedSort = sort === "none" ? "updated" : sort;
 
   const multiplier =
@@ -703,7 +715,7 @@ function ProjectModeSections({
   const visibilityGroups: ThreadListVisibilityGroup[] = [
     {
       id: "threads",
-      title: "Threads",
+      title: threadsSection.label,
       threads: personalThreads,
       onNewThread:
         personalProjectId === null
@@ -1169,7 +1181,7 @@ export function MachineModeSections({
   const visibilityGroups: ThreadListVisibilityGroup[] = [
     {
       id: "threads",
-      title: "Threads",
+      title: threadsSection.label,
       threads: nonPinnedThreads,
       onNewThread: onCreateThread,
       renderContent: (close: () => void) => (
@@ -1543,15 +1555,23 @@ function ProjectListComponent({
   );
   const sortDirection = useAtomValue(sidebarSortDirectionAtom);
   const activeRename = useSidebarRenameState();
+  const manualThreadOrder = useAtomValue(sidebarManualThreadOrderAtom);
+  const threadsSectionLabel = useAtomValue(sidebarThreadsSectionLabelAtom);
   const baseThreadComparator = useMemo<ThreadComparator>(
     () =>
       getSidebarThreadComparator(
         chronologicalSort,
         sortDirection,
         activeRename,
+        manualThreadOrder,
       ),
-    [chronologicalSort, sortDirection, activeRename],
+    [chronologicalSort, sortDirection, activeRename, manualThreadOrder],
   );
+  useThreadPipelineControls({
+    threads,
+    comparator: baseThreadComparator,
+    ready: preferencesReady && status === "ready",
+  });
   const {
     comparator: sidebarThreadComparator,
     collapsedThreadIds,
@@ -1655,8 +1675,8 @@ function ProjectListComponent({
     actionsOpen: isSectionDisplayOptionsOpen("pinned"),
   };
   const threadsSection = {
-    label: "Threads",
-    actions: renderSectionDisplayOptions("threads", "Threads"),
+    label: threadsSectionLabel,
+    actions: renderSectionDisplayOptions("threads", threadsSectionLabel),
     actionsOpen: isSectionDisplayOptionsOpen("threads"),
   } satisfies Omit<BuiltInSidebarSectionOptions, "content">;
   const sectionCreateDialog = (

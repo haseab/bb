@@ -58,8 +58,7 @@ const {
   resetSidebarTitleDoubleClickForTest,
   SidebarProvidersContext,
   ThreadRow,
-} =
-  await import("./ThreadRow.js");
+} = await import("./ThreadRow.js");
 
 const DEFAULT_OPTIONS: ThreadRowOptions = {
   kind: "default",
@@ -122,37 +121,37 @@ function ThreadRowHarness({
   const content = (
     <SidebarProjectsContext.Provider value={projects}>
       <SidebarProvidersContext.Provider value={providers}>
-      <TooltipProvider>
-      <SidebarDraftPresenceSync />
-      <ThreadRowNavigationProvider>
-      <ThreadSelectionProvider activeThreadId={null}>
-        <SidebarRenameProvider>
-          <CustomizeRowActionsContext.Provider
-            value={onCustomizeRowActions ?? null}
-          >
-            <ThreadRowActionsCustomizingContext.Provider
-              value={
-                onFinishCustomizingRowActions
-                  ? {
-                      threadId: thread.id,
-                      onDone: onFinishCustomizingRowActions,
+        <TooltipProvider>
+          <SidebarDraftPresenceSync />
+          <ThreadRowNavigationProvider>
+            <ThreadSelectionProvider activeThreadId={null}>
+              <SidebarRenameProvider>
+                <CustomizeRowActionsContext.Provider
+                  value={onCustomizeRowActions ?? null}
+                >
+                  <ThreadRowActionsCustomizingContext.Provider
+                    value={
+                      onFinishCustomizingRowActions
+                        ? {
+                            threadId: thread.id,
+                            onDone: onFinishCustomizingRowActions,
+                          }
+                        : null
                     }
-                  : null
-              }
-            >
-              <div
-                onPointerDown={onRowEvent}
-                onKeyDown={onRowEvent}
-                onClick={onRowEvent}
-              >
-                {row}
-              </div>
-            </ThreadRowActionsCustomizingContext.Provider>
-          </CustomizeRowActionsContext.Provider>
-        </SidebarRenameProvider>
-      </ThreadSelectionProvider>
-      </ThreadRowNavigationProvider>
-      </TooltipProvider>
+                  >
+                    <div
+                      onPointerDown={onRowEvent}
+                      onKeyDown={onRowEvent}
+                      onClick={onRowEvent}
+                    >
+                      {row}
+                    </div>
+                  </ThreadRowActionsCustomizingContext.Provider>
+                </CustomizeRowActionsContext.Provider>
+              </SidebarRenameProvider>
+            </ThreadSelectionProvider>
+          </ThreadRowNavigationProvider>
+        </TooltipProvider>
       </SidebarProvidersContext.Provider>
     </SidebarProjectsContext.Provider>
   );
@@ -193,7 +192,7 @@ function renderThreadRow({
   experiments,
   ...harness
 }: RenderThreadRowArgs = {}): RenderedSlot & {
-  rerenderThreadRow(nextThread: PluginSidebarThread): void;
+  rerenderThreadRow(nextThread: PluginSidebarThread, isActive?: boolean): void;
 } {
   const slot = renderSlot(
     { component: ThreadRowHarness },
@@ -221,13 +220,14 @@ function renderThreadRow({
     },
   );
   return Object.assign(slot, {
-    rerenderThreadRow(nextThread: PluginSidebarThread) {
+    rerenderThreadRow(nextThread: PluginSidebarThread, isActive?: boolean) {
       slot.lifecycle.rerender(
         <ThreadRowHarness
           thread={nextThread}
           projects={projects}
           providers={providers}
           {...harness}
+          isActive={isActive ?? harness.isActive}
         />,
       );
     },
@@ -396,6 +396,17 @@ describe("ThreadRow", () => {
     expect(screen.getByRole("img", { name: "Test Provider" })).toBeTruthy();
     expect(slot.inspection.navigateCalls).toEqual([]);
 
+    const icon = slot.container.querySelector("[data-sidebar-thread-provider]");
+    expect(icon?.getAttribute("aria-description")).toBe("Created in bb");
+    slot.rerenderThreadRow(
+      createThread({ experimental_creationSource: "native" }),
+    );
+    expect(
+      slot.container
+        .querySelector("[data-sidebar-thread-provider]")
+        ?.getAttribute("aria-description"),
+    ).toBe("Imported from provider-test");
+
     slot.rerenderThreadRow(createThread({ providerId: "missing" }));
     expect(screen.queryByRole("img", { name: "Test Provider" })).toBeNull();
     expect(
@@ -407,6 +418,30 @@ describe("ThreadRow", () => {
     expect(
       slot.container.querySelector("[data-sidebar-thread-provider]"),
     ).toBeNull();
+
+    act(() => getDefaultStore().set(sidebarShowProviderIconsAtom, true));
+    const codex = renderThreadRow({
+      providers: [{ ...provider, id: "codex" }],
+      thread: createThread({ providerId: "codex" }),
+    });
+    const bbIcon = codex.container.querySelector<HTMLElement>(
+      "[data-sidebar-thread-provider]",
+    );
+    expect(bbIcon?.getAttribute("data-thread-origin")).toBe("bb");
+    expect(bbIcon?.style.color).toContain("300");
+    codex.rerenderThreadRow(
+      createThread({
+        providerId: "codex",
+        experimental_creationSource: "native",
+      }),
+    );
+    const nativeIcon = codex.container.querySelector<HTMLElement>(
+      "[data-sidebar-thread-provider]",
+    );
+    expect(nativeIcon?.style.color).toBe("");
+    expect(nativeIcon?.getAttribute("aria-description")).toBe(
+      "Imported from Codex",
+    );
   });
 
   it("links the row to the thread href and leaves a plain click to the host", () => {
@@ -441,20 +476,25 @@ describe("ThreadRow", () => {
   it.each([
     ["meta", { metaKey: true }],
     ["ctrl", { ctrlKey: true }],
-  ])("selects the row on %s-shift-click and still splits without shift with multi-select on", (_label, modifier) => {
-    const slot = renderThreadRow({ experiments: ["sidebarMultiSelect"] });
-    const link = screen.getByRole("link", { name: "Open Thread" });
-    const row = link.closest("[data-sidebar-rename-row]");
-    expect(row?.hasAttribute("data-sidebar-thread-selected")).toBe(false);
-    expect(fireEvent.click(link, { ...modifier, shiftKey: true })).toBe(false);
-    expect(row?.hasAttribute("data-sidebar-thread-selected")).toBe(true);
-    expect(slot.inspection.navigateCalls).toEqual([]);
-    expect(fireEvent.click(link, modifier)).toBe(false);
-    expect(row?.hasAttribute("data-sidebar-thread-selected")).toBe(false);
-    expect(slot.inspection.navigateCalls).toEqual([
-      { method: "toThread", threadId: "thr_test", options: { split: true } },
-    ]);
-  });
+  ])(
+    "selects the row on %s-shift-click and still splits without shift with multi-select on",
+    (_label, modifier) => {
+      const slot = renderThreadRow({ experiments: ["sidebarMultiSelect"] });
+      const link = screen.getByRole("link", { name: "Open Thread" });
+      const row = link.closest("[data-sidebar-rename-row]");
+      expect(row?.hasAttribute("data-sidebar-thread-selected")).toBe(false);
+      expect(fireEvent.click(link, { ...modifier, shiftKey: true })).toBe(
+        false,
+      );
+      expect(row?.hasAttribute("data-sidebar-thread-selected")).toBe(true);
+      expect(slot.inspection.navigateCalls).toEqual([]);
+      expect(fireEvent.click(link, modifier)).toBe(false);
+      expect(row?.hasAttribute("data-sidebar-thread-selected")).toBe(false);
+      expect(slot.inspection.navigateCalls).toEqual([
+        { method: "toThread", threadId: "thr_test", options: { split: true } },
+      ]);
+    },
+  );
 
   it("clears the selection on a press outside the sidebar but keeps it for menus", () => {
     renderThreadRow({ experiments: ["sidebarMultiSelect"] });
@@ -984,7 +1024,20 @@ describe("ThreadRow", () => {
     expect(screen.queryByText(/@thread:thr_mentioned/)).toBeNull();
   });
 
-  it("shows a project badge before the title and opens its thread", () => {
+  it.each([
+    ["deeplog", "DL"],
+    ["unplan", "UP"],
+    ["smash-leaderboard", "SL"],
+    ["general", "GL"],
+    ["os-v2", "COS"],
+    ["os-web", "COS"],
+    ["inbox0", "i0"],
+    ["guestbook", "GB"],
+    ["retrace", "RT"],
+    ["Web App", "WA"],
+    ["new-project", "NP"],
+    ["example", "EX"],
+  ])("shows the %s project badge as %s and opens its thread", (name, label) => {
     getDefaultStore().set(
       preferenceValueAtom("organizationMode"),
       "chronological",
@@ -993,15 +1046,15 @@ describe("ThreadRow", () => {
       projects: [
         {
           id: "proj_test",
-          name: "Web App",
+          name,
           isPersonal: false,
           href: "/projects/proj_test",
           settingsHref: "/projects/proj_test/settings",
         },
       ],
     });
-    const badge = screen.getByRole("img", { name: "In project Web App" });
-    expect(badge.textContent).toBe("WA");
+    const badge = screen.getByRole("img", { name: `In project ${name}` });
+    expect(badge.textContent).toBe(label);
     expect(
       badge.parentElement?.querySelector(".bb-thread-title"),
     ).not.toBeNull();
@@ -1511,6 +1564,54 @@ describe("ThreadRow", () => {
     });
 
     expect(renderedIndicators()).toEqual(["unread-success"]);
+  });
+
+  it("opens an inactive row before Enter starts renaming the active row", async () => {
+    const thread = createThread();
+    const slot = renderThreadRow({ thread });
+    const link = screen.getByRole("link", { name: "Open Thread" });
+    link.focus();
+    expect(fireEvent.keyDown(link, { key: "Enter" })).toBe(true);
+    expect(screen.queryByRole("textbox", { name: "Thread name" })).toBeNull();
+    link.blur();
+    slot.rerenderThreadRow(thread, true);
+    await waitFor(() => expect(document.activeElement).toBe(link));
+    expect(fireEvent.keyDown(link, { key: "Enter" })).toBe(false);
+    expect(
+      await screen.findByRole("textbox", { name: "Thread name" }),
+    ).toHaveProperty("value", "Thread");
+  });
+
+  it("renames the open thread on Enter and saves with Enter", async () => {
+    const slot = renderThreadRow({
+      isActive: true,
+      sdk: { threads: { update: vi.fn().mockResolvedValue({}) } },
+    });
+    const link = screen.getByRole("link", { name: "Open Thread" });
+    for (const modifiers of [
+      { metaKey: true },
+      { ctrlKey: true },
+      { altKey: true },
+      { shiftKey: true },
+      { repeat: true },
+    ]) {
+      expect(fireEvent.keyDown(link, { key: "Enter", ...modifiers })).toBe(
+        true,
+      );
+    }
+    expect(screen.queryByRole("textbox", { name: "Thread name" })).toBeNull();
+    fireEvent.keyDown(link, { key: "Enter" });
+    const input = await screen.findByRole("textbox", { name: "Thread name" });
+    fireEvent.change(input, { target: { value: "Keyboard rename" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() =>
+      expect(slot.inspection.sdkCalls).toEqual([
+        {
+          method: "threads.update",
+          args: [{ threadId: "thr_test", title: "Keyboard rename" }],
+        },
+      ]),
+    );
   });
 
   it("edits the row title inline after a double click and commits on Enter", async () => {

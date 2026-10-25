@@ -8,13 +8,12 @@ import {
 } from "../services/machines/environment-storage.js";
 import { getGateAuthKind } from "../request-context.js";
 import {
-  countProjectSources,
-  findOrCreateProjectByLocalPathSource,
+  createProject,
   getPersonalProject,
   getProjectExecutionDefaults,
-  getPublicProjectByLocalPathSource,
   deleteProjectSource,
   getProjectSourceByHost,
+  getProjectSourceByHostPath,
   getProjectSourceForProject,
   listProjectExecutionDefaultsByProjectIds,
   listPublicProjects,
@@ -470,27 +469,22 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
 
   post(routes.create, async (context, payload) => {
     const { source } = payload;
+    if (source === undefined) {
+      const { project } = createProject(deps.db, deps.hub, {
+        name: payload.name,
+      });
+      return context.json(buildProjectResponses(deps, project.id)[0], 201);
+    }
     if (source.type === "local_path") {
       requireNonDestroyedHostWithStatus(deps, source.hostId);
       assertUsableHostId(deps, { hostId: source.hostId });
       assertPathMatchesHostPlatform(deps, source);
     }
-    const existingProject = getPublicProjectByLocalPathSource(deps.db, source);
-    if (existingProject) {
-      return context.json(
-        buildProjectResponses(deps, existingProject.id)[0],
-        201,
-      );
-    }
     const gitRemoteUrl = await inspectProjectGitRemoteBestEffort(deps, source);
-    const { project } = findOrCreateProjectByLocalPathSource(
-      deps.db,
-      deps.hub,
-      {
-        name: payload.name,
-        source,
-      },
-    );
+    const { project } = createProject(deps.db, deps.hub, {
+      name: payload.name,
+      source,
+    });
     if (gitRemoteUrl !== null) {
       setProjectGitRemoteUrlIfMissing(
         deps.db,
@@ -585,7 +579,10 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
     const project = requirePublicStandardProject(deps.db, projectId);
     requireNonDestroyedHostWithStatus(deps, payload.hostId);
     assertUsableHostId(deps, { hostId: payload.hostId });
-    if (getProjectSourceByHost(deps.db, projectId, payload.hostId)) {
+    if (
+      payload.type === "clone" &&
+      getProjectSourceByHost(deps.db, projectId, payload.hostId)
+    ) {
       throw projectSourceHostConflict();
     }
     const requestedPath =
@@ -635,6 +632,21 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
         });
       }
     }
+    if (payload.path !== undefined) {
+      const duplicate = getProjectSourceByHostPath(
+        deps.db,
+        projectId,
+        existing.hostId,
+        payload.path,
+      );
+      if (duplicate !== null && duplicate.id !== existing.id) {
+        throw new ApiError(
+          409,
+          "project_source_path_conflict",
+          "This folder is already attached to the project on this machine",
+        );
+      }
+    }
     if (payload.type !== existing.type) {
       throw new ApiError(
         400,
@@ -681,14 +693,6 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
       projectId,
       sourceId: context.req.param("sourceId"),
     });
-    const sourceCount = countProjectSources(deps.db, { projectId });
-    if (sourceCount <= 1 && project.deletedAt === null) {
-      throw new ApiError(
-        409,
-        "invalid_request",
-        "Cannot delete the last source of a project",
-      );
-    }
     const deleted = deleteProjectSource(
       deps.db,
       deps.hub,

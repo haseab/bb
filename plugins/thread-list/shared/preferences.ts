@@ -18,6 +18,7 @@ export const chronologicalSortSchema = z.enum([
   "created",
   "alpha",
   "none",
+  "manual",
 ]);
 export type ChronologicalSort = z.infer<typeof chronologicalSortSchema>;
 
@@ -122,6 +123,24 @@ export const preferenceDefinitions = {
     z.boolean(),
     false,
     "List threads that show an unread dot above the rest, keeping the selected sort within each group. The open thread keeps its place until another thread is opened.",
+    null,
+  ),
+  autoActiveSectionId: definePreference(
+    listItemSchema.nullable(),
+    null,
+    "Move unsectioned queued root threads to this section when they become active, at the top of manual order, and return idle threads in this section to the queue. Other sections are preserved. null disables this rule.",
+    null,
+  ),
+  manualThreadOrder: definePreference(
+    stringListSchema,
+    [],
+    "Thread ids in manual display order. Used when chronologicalSort is manual.",
+    null,
+  ),
+  threadsSectionLabel: definePreference(
+    z.string().trim().min(1).max(128),
+    "Threads",
+    "Label for unsectioned threads, such as Queued in a manual pipeline.",
     null,
   ),
   chronologicalSort: definePreference(

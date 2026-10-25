@@ -26,6 +26,9 @@ import { useSidebarData } from "../model/use-sidebar-data.js";
 import { useMoveDestinations } from "../rows/moveThreadAction.js";
 import { useThreadSelectionStore } from "./threadSelection.js";
 
+import { moveThreadToSection } from "../rows/moveThreadToSection.js";
+import { captureThreadPipelinePositions } from "../pipeline/threadPipelineAnimation.js";
+
 const SURFACE = "context";
 
 function stopMenuClickPropagation(event: MouseEvent) {
@@ -109,22 +112,14 @@ function ThreadSelectionMenuItems({
       )
       .catch(() => toast.error("Failed to pin threads."));
   };
-  const moveToSection = (sectionId: string | null) =>
+  const moveToSection = (sectionId: string | null) => {
+    captureThreadPipelinePositions();
     void settleAll(
-      roots.map(async (thread) => {
-        if (thread.pinnedAt !== null) {
-          await sdk.threads.unpin({ threadId: thread.id });
-        }
-        if (thread.sectionId !== sectionId || thread.parentThreadId !== null) {
-          await sdk.threads.update({
-            threadId: thread.id,
-            sectionId,
-            ...(thread.parentThreadId === null ? {} : { parentThreadId: null }),
-          });
-        }
-      }),
+      roots.map((thread) => moveThreadToSection(sdk, thread, sectionId)),
+
       "Failed to move threads.",
     );
+  };
   const archive = async () => {
     const results = await Promise.allSettled(
       active.map((thread) => sdk.threads.archive({ threadId: thread.id })),
@@ -175,7 +170,7 @@ function ThreadSelectionMenuItems({
         <ContextMenuSub>
           <ContextMenuSubTrigger>
             <Icon name="SectionMove" aria-hidden="true" />
-            Move to section
+            Move to
           </ContextMenuSubTrigger>
           <ContextMenuSubContent>
             {destinations.map((destination) => (

@@ -8,12 +8,14 @@ import { splitPrefetch } from "./vite-split-prefetch.js";
 import { routeModulePreload } from "./vite-route-modulepreload.js";
 import { fontPreload } from "./vite-font-preload.js";
 import { sharedUiEnvSeam } from "./vite-shared-ui-seam.js";
+import { localBuildVersionPlugin } from "./vite-local-build.js";
 import { cachedReactCompiler } from "./vite-react-compiler.js";
 
 const appDir = dirname(fileURLToPath(import.meta.url));
 
 export const sharedViteConfig = {
   plugins: [
+    localBuildVersionPlugin(),
     sharedUiEnvSeam(),
     react(),
     cachedReactCompiler(),

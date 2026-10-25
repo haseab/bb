@@ -3,43 +3,24 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useState,
   type ReactNode,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { deriveProjectNameFromPath, type Host } from "@bb/domain";
-import type { HostPlatform } from "@bb/host-daemon-contract";
 import { useCreateProject } from "@/hooks/mutations/project-mutations";
-import { selectHosts, useHosts } from "@/hooks/queries/host-queries";
-import {
-  useLocalPathPicker,
-  type LocalPathSubmitParams,
-} from "@/hooks/useLocalPathPicker";
 import {
   APP_ROOT_ROUTE_PATH,
   getRootComposeRoutePath,
 } from "@/lib/route-paths";
 import { useSetRootComposeProjectId } from "@/lib/root-compose-selection";
-import type {
-  ProjectPathDialogSubmitHandler,
-  ProjectPathDialogTarget,
-} from "@/components/dialogs/ProjectPathDialog";
-
-interface QuickCreateProjectDialogState {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  target: ProjectPathDialogTarget | null;
-}
 
 interface QuickCreateProjectController {
   isAvailable: boolean;
   isCreating: boolean;
   openCreateDialog: () => void;
-  platform: HostPlatform | null;
-  hostId: string | null;
-  hostName: string | null;
-  hosts: readonly Host[];
-  projectPathDialog: QuickCreateProjectDialogState;
-  submitProjectPath: ProjectPathDialogSubmitHandler;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  createProject: (name: string) => void;
 }
 
 const quickCreateProjectContext =
@@ -47,30 +28,20 @@ const quickCreateProjectContext =
 
 export function useQuickCreateProject(): QuickCreateProjectController {
   const { mutate, isPending } = useCreateProject();
-  const hostsQuery = useHosts();
-  const hosts = useMemo(
-    () => selectHosts(hostsQuery.data, "all"),
-    [hostsQuery.data],
-  );
+  const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const setRootComposeProjectId = useSetRootComposeProjectId();
   const shouldReplaceRoute = location.pathname === APP_ROOT_ROUTE_PATH;
 
-  const submit = useCallback(
-    ({ path, hostId, target, closeDialog }: LocalPathSubmitParams) => {
-      if (target.kind !== "create") return;
-      const name = deriveProjectNameFromPath(path).trim();
-      if (!name) return;
-
+  const createProject = useCallback(
+    (name: string) => {
+      if (isPending || !name.trim()) return;
       mutate(
-        {
-          name,
-          source: { type: "local_path", hostId, path },
-        },
+        { name: name.trim() },
         {
           onSuccess: (project) => {
-            closeDialog();
+            setIsOpen(false);
             setRootComposeProjectId(project.id);
             void navigate(getRootComposeRoutePath(), {
               replace: shouldReplaceRoute,
@@ -79,31 +50,25 @@ export function useQuickCreateProject(): QuickCreateProjectController {
         },
       );
     },
-    [mutate, navigate, setRootComposeProjectId, shouldReplaceRoute],
+    [isPending, mutate, navigate, setRootComposeProjectId, shouldReplaceRoute],
   );
-
-  const controller = useLocalPathPicker({
-    isPending,
-    submit,
-  });
-
-  const openCreateDialog = useCallback(() => {
-    controller.openPathEntry({ kind: "create" });
-  }, [controller]);
-
+  const openCreateDialog = useCallback(() => setIsOpen(true), []);
+  const onOpenChange = useCallback(
+    (open: boolean) => {
+      if (!isPending) setIsOpen(open);
+    },
+    [isPending],
+  );
   return useMemo(
     () => ({
-      isAvailable: controller.isAvailable,
+      isAvailable: true,
       isCreating: isPending,
+      isOpen,
+      onOpenChange,
       openCreateDialog,
-      platform: controller.platform,
-      hostId: controller.hostId,
-      hostName: controller.hostName,
-      hosts,
-      projectPathDialog: controller.projectPathDialog,
-      submitProjectPath: controller.submitProjectPath,
+      createProject,
     }),
-    [controller, hosts, isPending, openCreateDialog],
+    [createProject, isOpen, isPending, onOpenChange, openCreateDialog],
   );
 }
 

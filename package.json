@@ -15,7 +15,7 @@
     "start": "cross-env NODE_ENV=production dotenv --no-expand -c production -- node --conditions=source --import tsx scripts/start-bb.mjs",
     "start:worktree": "cross-env NODE_ENV=development dotenv --no-expand -c development -- node --conditions=source --import tsx packages/scripts/src/commands/run-dev.ts --worktree",
     "start:worktree-remote": "cross-env BB_SERVER_BIND_HOST=0.0.0.0 pnpm run start:worktree",
-    "desktop:package": "pnpm exec turbo run package --filter=@bb/desktop --output-logs=errors-only",
+    "desktop:package": "node --import tsx apps/desktop/scripts/package-local.mjs",
     "desktop": "cross-env NODE_ENV=production dotenv --no-expand -c production -- node --conditions=source --import tsx packages/scripts/src/commands/run-desktop.ts",
     "desktop:worktree": "cross-env NODE_ENV=development dotenv --no-expand -c development -- node --conditions=source --import tsx packages/scripts/src/commands/run-desktop.ts --worktree",
     "mobile:apk:dev": "pnpm exec turbo run build:android:dev --filter=@bb/mobile",

@@ -2547,6 +2547,41 @@ describe("ComposerBox submit shortcuts", () => {
 });
 
 describe("ComposerBox escape", () => {
+  it.each(["", "Keep this draft"])(
+    "stops a running thread with Escape and the button while preserving draft %j",
+    async (value) => {
+      const onStop = vi.fn();
+      const onSubmit = vi.fn();
+      const promptBoxRef = createRef<PromptBoxHandle>();
+      render(
+        <ComposerBox
+          {...createPromptBoxProps({
+            value,
+            onSubmit,
+            submission: { isRunning: true, onStop },
+          })}
+          promptBoxRef={promptBoxRef}
+        />,
+      );
+      await focusPromptEnd(promptBoxRef);
+      const editor = getPromptEditorElement();
+
+      expect(fireEvent.keyDown(editor, { key: "Escape" })).toBe(false);
+      expect(onStop).toHaveBeenCalledOnce();
+      expect(document.activeElement).toBe(editor);
+      expect(editor.textContent).toBe(value);
+      expect(onSubmit).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Stop run" }));
+      expect(onStop).toHaveBeenCalledTimes(2);
+      expect(editor.textContent).toBe(value);
+      if (value) {
+        fireEvent.keyDown(editor, { key: "Enter" });
+        expect(onSubmit).toHaveBeenCalledOnce();
+      }
+    },
+  );
+
   it("blurs the editor when no host Escape action is provided", async () => {
     const promptBoxRef = createRef<PromptBoxHandle>();
     render(
@@ -2566,10 +2601,15 @@ describe("ComposerBox escape", () => {
 
   it("routes Escape to onEscape instead of blurring the editor", async () => {
     const onEscape = vi.fn();
+    const onStop = vi.fn();
     const promptBoxRef = createRef<PromptBoxHandle>();
     render(
       <ComposerBox
-        {...createPromptBoxProps({ onEscape, value: "Edited message" })}
+        {...createPromptBoxProps({
+          onEscape,
+          value: "Edited message",
+          submission: { isRunning: true, onStop },
+        })}
         promptBoxRef={promptBoxRef}
       />,
     );
@@ -2580,6 +2620,7 @@ describe("ComposerBox escape", () => {
     });
 
     expect(onEscape).toHaveBeenCalledTimes(1);
+    expect(onStop).not.toHaveBeenCalled();
     expect(wasNotCanceled).toBe(false);
     expect(document.activeElement).toBe(getPromptEditorElement());
   });

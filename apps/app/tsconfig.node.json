@@ -9,6 +9,7 @@
   },
   "include": [
     "vite.config.ts",
+    "vite-local-build.ts",
     "vite.dev.config.ts",
     "vite-bundle-stats.ts",
     "vite-font-preload.ts",

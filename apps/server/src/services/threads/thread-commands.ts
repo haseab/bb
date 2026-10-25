@@ -128,6 +128,7 @@ interface RuntimeExecutionOptionsArgs {
   input: PromptInput[];
   permissionEscalation: PermissionEscalation;
   projectId: string;
+  projectFolderPaths: string[];
   providerId: string;
   threadId: string;
 }
@@ -221,7 +222,12 @@ function toRuntimeExecutionOptions(
     reasoningLevel: args.execution.reasoningLevel,
     ...(promptMode !== undefined ? { promptMode } : {}),
     ...(Object.keys(sessionOptions).length > 0 ? { sessionOptions } : {}),
-    providerOptions,
+    providerOptions: {
+      ...providerOptions,
+      ...(args.projectFolderPaths.length > 0
+        ? { additionalWorkspaceWriteRoots: args.projectFolderPaths }
+        : {}),
+    },
   };
   if (permissionMode === "full") {
     return {
@@ -297,6 +303,7 @@ export async function buildThreadStartCommand(
       ...args,
       deps,
       hostId: args.environment.hostId,
+      projectFolderPaths: runtimeContext.projectFolderPaths,
       input: args.input,
       threadId: args.thread.id,
     }),
@@ -330,6 +337,7 @@ function buildPreparedTurnSubmitCommandPayload(
       ...args,
       input: args.input,
       projectId: args.runtimeContext.projectId,
+      projectFolderPaths: args.runtimeContext.projectFolderPaths,
       providerId: args.runtimeContext.providerId,
     }),
     target: args.target,

@@ -1,3 +1,4 @@
+import { readLocalBuildVersion } from "../services/system/local-build-version.js";
 import { createMobileAppReleaseService } from "../services/install/mobile-app-releases.js";
 import {
   setMachineEnvironmentVariable,
@@ -149,6 +150,7 @@ export function registerSystemRoutes(
   app: Hono,
   deps: ServerAppDeps,
   pluginService: PluginService,
+  frontendDir?: string,
 ): void {
   const { get, post, put, del } = typedRoutes<PublicApiSchema>(app, {
     onValidationError: (msg) => new ApiError(400, "invalid_request", msg),
@@ -696,13 +698,15 @@ export function registerSystemRoutes(
     });
   });
 
-  get(routes.version, async (context, query) =>
-    context.json(
-      await deps.appVersion.getSystemVersion({
-        forceRefresh: query.force === "true",
-      }),
-    ),
-  );
+  get(routes.version, async (context, query) => {
+    const version = await deps.appVersion.getSystemVersion({
+      forceRefresh: query.force === "true",
+    });
+    return context.json({
+      ...version,
+      localBuildVersion: await readLocalBuildVersion(frontendDir),
+    });
+  });
 
   get(routes.appUpdate, async (context, query) =>
     context.json(

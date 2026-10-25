@@ -35,6 +35,7 @@ describe("GET /api/v1/system/version", () => {
         expect(body.isDevelopment).toBe(true);
         expect(body.updateAvailable).toBe(false);
         expect(body.latestVersion).toBeNull();
+        expect(body.localBuildVersion).toBeNull();
       },
     );
   });

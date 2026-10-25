@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { moveThreadToSection } from "./moveThreadToSection.js";
+import { captureThreadPipelinePositions } from "../pipeline/threadPipelineAnimation.js";
 import { useAtomValue } from "jotai";
 import { toast } from "sonner";
 import {
@@ -13,6 +15,7 @@ import {
 import {
   sidebarManualSectionOrderAtom,
   sidebarOrganizationModeAtom,
+  sidebarThreadsSectionLabelAtom,
 } from "../preferences/atoms.js";
 import { usePreferencesSync } from "../preferences/PreferencesSync.js";
 
@@ -32,6 +35,7 @@ export function useMoveDestinations():
   | null {
   usePreferencesSync();
   const mode = useAtomValue(sidebarOrganizationModeAtom);
+  const threadsLabel = useAtomValue(sidebarThreadsSectionLabelAtom);
   const storedOrder = useAtomValue(sidebarManualSectionOrderAtom);
   const { sections } = experimental_useSidebarThreads();
   const destinations =
@@ -44,7 +48,8 @@ export function useMoveDestinations():
           legacyEntityAnchor: "sections",
           hasPinnedSection: true,
         }).flatMap<ThreadSectionMoveDestination>((id) => {
-          if (id === "threads") return [{ label: "Threads", sectionId: null }];
+          if (id === "threads")
+            return [{ label: threadsLabel, sectionId: null }];
           const section = sections.find(
             (candidate) =>
               buildSidebarEntitySectionId("section", candidate.id) === id,
@@ -65,26 +70,24 @@ export const moveThreadAction: PluginThreadActionRegistration<
   readonly ThreadSectionMoveDestination[] | null
 > = {
   id: "move",
-  title: "Move to section",
+  title: "Move to",
   icon: "SectionMove",
   group: experimental_THREAD_ACTION_GROUPS.organize,
   order: 50,
   useData: useMoveDestinations,
   item: ({ thread, data: destinations, sdk }) => {
-    if (
-      destinations === null ||
-      thread.parentThreadId !== null ||
-      thread.archivedAt !== null
-    ) {
+    if (destinations === null || thread.archivedAt !== null) {
       return null;
     }
     const isCurrent = (sectionId: string | null) =>
-      thread.pinnedAt === null && thread.sectionId === sectionId;
+      thread.pinnedAt === null &&
+      thread.parentThreadId === null &&
+      thread.sectionId === sectionId;
     if (destinations.every((destination) => isCurrent(destination.sectionId))) {
       return null;
     }
     return {
-      label: "Move to section",
+      label: "Move to",
       icon: "SectionMove",
       choices: {
         items: destinations.map((destination) => ({
@@ -99,27 +102,12 @@ export const moveThreadAction: PluginThreadActionRegistration<
           (candidate) => choiceId(candidate.sectionId) === value,
         );
         if (destination === undefined) return;
-        const threadId = thread.id;
-        const { sectionId } = destination;
-        if (thread.pinnedAt !== null) {
-          if (thread.sectionId === sectionId) {
-            void sdk.threads.unpin({ threadId }).catch(() => {
-              toast.error("Failed to unpin thread.");
-            });
-            return;
-          }
-          void Promise.all([
-            sdk.threads.unpin({ threadId }),
-            sdk.threads.update({ threadId, sectionId }),
-          ]).catch(() => {
-            toast.error("Failed to unpin and move thread.");
-          });
-          return;
-        }
-        if (thread.sectionId === sectionId) return;
-        void sdk.threads.update({ threadId, sectionId }).catch(() => {
-          toast.error("Failed to move thread.");
-        });
+        captureThreadPipelinePositions();
+        void moveThreadToSection(sdk, thread, destination.sectionId).catch(
+          () => {
+            toast.error("Failed to move thread.");
+          },
+        );
       },
     };
   },

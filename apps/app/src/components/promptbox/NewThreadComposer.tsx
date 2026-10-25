@@ -221,6 +221,7 @@ interface NewThreadComposerPromptOptions {
 type ParsedEnvironment = ReturnType<typeof parseEnvironmentValue>;
 
 export interface NewThreadComposerState {
+  changeProject: (projectId: string) => Promise<ProjectChangeOutcome>;
   projectId: string;
   isProjectless: boolean;
   projects: readonly SidebarProject[] | undefined;
@@ -2203,6 +2204,7 @@ export function NewThreadComposer({
     <NewThreadComposerStateRenderer
       render={children}
       state={{
+        changeProject,
         projectId,
         isProjectless,
         projects,
