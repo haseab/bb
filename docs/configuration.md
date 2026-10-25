@@ -383,6 +383,13 @@ unbinds a command. Overrides may be scoped to `mac`, `windows`, or `linux`. Plug
 commands bind as `plugin:<plugin-id>/<command-id>`. See
 `bb guide customization` for scoping and plugin-binding rules.
 
+On macOS desktop, `app.toggle` defaults to `Command+5` globally, even while
+another app is focused. It hides bb when focused and otherwise restores its last
+focused window, including minimized windows; with all windows closed it creates
+one. Set or disable it through Settings → Keyboard, SDK keyboard settings, or
+`bb settings keyboard set app.toggle disabled --platform mac`. Quit releases
+the shortcut. If another application owns the binding, bb logs the conflict.
+
 `showKeyboardHints` (default `true`; `bb settings keyboard hints <true|false>`)
 shows delayed shortcut badges while the modifier is held; shortcuts work
 either way.
@@ -390,7 +397,7 @@ either way.
 `Mod` means Command on macOS and Control on Windows/Linux. Numbered thread and
 pane shortcuts follow Slack's browser-safe convention: web uses
 `Control+1…9` on macOS and `Ctrl+Shift+1…9` on Windows/Linux, while desktop
-uses `Mod+1…9`. The web aliases leave native browser `Mod+1…9` tab switching
+uses `Mod+1…9`, except macOS uses `Control+5` for thread 5 because `Command+5` globally shows or hides bb. The web aliases leave native browser `Mod+1…9` tab switching
 untouched. Previous and next thread use `Mod+Shift+[/]` on desktop and
 `Control+Shift+[/]` on the web; they follow the sidebar order.
 

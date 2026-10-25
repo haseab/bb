@@ -119,8 +119,25 @@ function numberedChatBindings(
       {
         ...options,
         desktopOnly: true,
+        ...(index === 4
+          ? { none: [...(options.none ?? []), "macPlatform"] }
+          : {}),
       },
     ),
+    ...(index === 4
+      ? [
+          binding(
+            command,
+            "5",
+            { control: true },
+            {
+              ...options,
+              desktopOnly: true,
+              all: [...(options.all ?? []), "macPlatform"],
+            },
+          ),
+        ]
+      : []),
   ]);
 }
 
@@ -417,6 +434,12 @@ export const DEFAULT_APP_KEYBINDINGS: AppDefaultKeybindings = [
       ...mainWithoutModal,
       desktopOnly: true,
     },
+  ),
+  binding(
+    "app.toggle",
+    "5",
+    { mod: true },
+    { desktopOnly: true, all: ["macPlatform"] },
   ),
   unassignedBinding("logs.openServerDaemon", {
     all: ["mainSurface"],

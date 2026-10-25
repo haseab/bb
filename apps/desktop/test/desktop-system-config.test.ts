@@ -39,3 +39,15 @@ describe("parseDesktopSystemConfig", () => {
     expect(() => parseDesktopSystemConfig({})).toThrow();
   });
 });
+
+it("recognizes global-toggle support even when its shortcut is disabled", () => {
+  expect(
+    parseDesktopSystemConfig({
+      keybindings: [],
+      defaultKeybindings: [{ command: "app.toggle" }],
+    }).supportsAppToggle,
+  ).toBe(true);
+  expect(parseDesktopSystemConfig({ keybindings: [] }).supportsAppToggle).toBe(
+    false,
+  );
+});
