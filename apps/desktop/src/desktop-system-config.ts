@@ -12,10 +12,12 @@ const desktopKeybindingSchema = appKeybindingSchema.extend({
 
 const desktopSystemConfigSchema = z.object({
   keybindings: z.array(desktopKeybindingSchema).max(256),
+  defaultKeybindings: z.array(z.object({ command: z.string() })).optional(),
 });
 
 interface DesktopSystemConfig {
   keybindings: AppKeybindings;
+  supportsAppToggle: boolean;
 }
 
 export function parseDesktopSystemConfig(
@@ -30,5 +32,12 @@ export function parseDesktopSystemConfig(
     }
     keybindings.push({ ...binding, command: command.data });
   }
-  return { keybindings };
+  return {
+    keybindings,
+    supportsAppToggle:
+      parsed.defaultKeybindings?.some(
+        (binding) => binding.command === "app.toggle",
+      ) ??
+      parsed.keybindings.some((binding) => binding.command === "app.toggle"),
+  };
 }

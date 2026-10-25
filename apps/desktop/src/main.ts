@@ -1,3 +1,4 @@
+import { createDesktopAppToggle } from "./desktop-app-toggle.js";
 import { createDesktopLogger } from "./desktop-logger.js";
 import { spawn } from "node:child_process";
 import { attachServerUpdateControl } from "./server-update-control.js";
@@ -12,6 +13,7 @@ import {
   BrowserWindow,
   clipboard,
   dialog,
+  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
@@ -405,6 +407,7 @@ let desktopBrowserBroker: DesktopBrowserBroker | null = null;
 let desktopBrowserBrokerClient: ReturnType<
   typeof createDesktopBrowserBrokerClient
 > | null = null;
+let desktopAppToggle: ReturnType<typeof createDesktopAppToggle> | null = null;
 let currentAppKeybindings: AppKeybindings = [];
 let currentApplicationMenuAccelerators = DEFAULT_APPLICATION_MENU_ACCELERATORS;
 let desktopUpdateService: DesktopUpdateService | null = null;
@@ -1047,6 +1050,7 @@ async function refreshSystemConfig(
       return;
     }
     currentAppKeybindings = config.keybindings;
+    desktopAppToggle?.sync(config.keybindings, config.supportsAppToggle);
     currentApplicationMenuAccelerators = resolveApplicationMenuAccelerators(
       currentAppKeybindings,
     );
@@ -1106,6 +1110,9 @@ function registerApplicationWindow(browserWindow: DesktopBrowserWindow): void {
   applicationWindowWebContentsIds.add(webContentsId);
   const nativeWindow = BrowserWindow.fromId(browserWindow.id);
   if (nativeWindow !== null) {
+    nativeWindow.on("focus", () =>
+      desktopAppToggle?.rememberWindow(nativeWindow.id),
+    );
     desktopBrowserBroker?.registerWindow(nativeWindow);
     nativeWindow.webContents.on(
       "did-start-navigation",
@@ -2327,6 +2334,7 @@ function handleBeforeQuit(event: Event): void {
 }
 
 async function finishQuit(): Promise<void> {
+  desktopAppToggle?.dispose();
   stopServerMovedWatcher();
   desktopBrowserBrokerClient?.stop();
   desktopBrowserBroker?.dispose();
@@ -2899,13 +2907,34 @@ async function runDesktopApp(): Promise<void> {
   });
 
   await app.whenReady();
+  desktopAppToggle = createDesktopAppToggle({
+    platform: process.platform,
+    windows: () =>
+      BrowserWindow.getAllWindows().filter((window) =>
+        applicationWindowWebContentsIds.has(window.webContents.id),
+      ),
+    hide: () => app.hide(),
+    show: () => app.show(),
+    createWindow: async () => {
+      await createApplicationWindow({
+        initialUrl: currentWindowUrl,
+        stateKey: null,
+      });
+      app.show();
+    },
+    register: (accelerator, callback) =>
+      globalShortcut.register(accelerator, callback),
+    unregister: (accelerator) => globalShortcut.unregister(accelerator),
+    warn: (message) => desktopLogger.warn(message),
+  });
+  desktopAppToggle.start();
+  app.on("will-quit", () => desktopAppToggle?.dispose());
   if (app.isPackaged) {
     await session.defaultSession.clearCache();
   }
 
   const paths = createDesktopPathContext();
-  const devIcon =
-    !paths.isPackaged || process.env.BB_DESKTOP_DEV_ICON === "1";
+  const devIcon = !paths.isPackaged || process.env.BB_DESKTOP_DEV_ICON === "1";
   const iconPath = resolveDesktopIconPath({
     devIcon,
     packagedIconFileName: DESKTOP_RELEASE_INFO.iconFileName,

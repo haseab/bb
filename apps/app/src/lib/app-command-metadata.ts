@@ -80,6 +80,11 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
         "Open quick palette",
         "Search and run bb commands from the keyboard.",
       ),
+      command(
+        "app.toggle",
+        "Show or hide bb",
+        "Globally show or hide the bb desktop app.",
+      ),
       command("window.new", "New window", "Open another bb desktop window."),
       command(
         "window.find",

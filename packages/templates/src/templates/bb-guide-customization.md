@@ -222,6 +222,13 @@ bb settings keyboard hints <true|false>
 bb settings keyboard set <command> <shortcut|disabled> [--platform mac|windows|linux]
 bb settings keyboard reset [command] [--platform mac|windows|linux]
 
+On macOS desktop, `app.toggle` is a global show/hide shortcut, default
+`Command+5`. It works while bb is in the background, restores minimized windows,
+and creates a window when none remain. Configure it with
+`bb settings keyboard set app.toggle Mod+5 --platform mac`, or use `disabled`
+to turn it off. The SDK uses the same keyboard settings. Thread 5 uses
+`Control+5` on macOS desktop to leave `Command+5` for the global toggle.
+
 `keyboard list` prints core command ids with their effective bindings, plus
 every saved override; examples include `panel.previousTab` / `panel.nextTab`,
 `pane.focus.left|right|up|down`, `pane.maximize.toggle`, and the initially

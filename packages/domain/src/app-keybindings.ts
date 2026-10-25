@@ -63,6 +63,7 @@ export const APP_COMMAND_IDS = [
   "window.find",
   "window.reload",
   "app.back",
+  "app.toggle",
   "settings.open",
   "settings.openServers",
   "sidebar.toggle",
