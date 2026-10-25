@@ -984,6 +984,37 @@ describe("ThreadRow", () => {
     expect(screen.queryByText(/@thread:thr_mentioned/)).toBeNull();
   });
 
+  it("shows a project badge before the title and opens its thread", () => {
+    getDefaultStore().set(
+      preferenceValueAtom("organizationMode"),
+      "chronological",
+    );
+    const { container } = renderThreadRow({
+      projects: [
+        {
+          id: "proj_test",
+          name: "Web App",
+          isPersonal: false,
+          href: "/projects/proj_test",
+          settingsHref: "/projects/proj_test/settings",
+        },
+      ],
+    });
+    const badge = screen.getByRole("img", { name: "In project Web App" });
+    expect(badge.textContent).toBe("WA");
+    expect(
+      badge.parentElement?.querySelector(".bb-thread-title"),
+    ).not.toBeNull();
+    expect(container.querySelector("[data-sidebar-thread-project]")).toBe(
+      badge,
+    );
+    const link = screen.getByRole("link", { name: "Open Thread" });
+    const click = vi.fn((event: Event) => event.preventDefault());
+    link.addEventListener("click", click);
+    fireEvent.click(badge);
+    expect(click).toHaveBeenCalledOnce();
+  });
+
   it("marks a child from another project with the project name", () => {
     const { container } = renderThreadRow({
       crossProjectId: "proj_other",

@@ -72,6 +72,11 @@ actions into three editable slots in place; each slot picks an action, a filled
 slot can Hide, and filled slots drag to reorder. Done, Escape, or a click
 elsewhere finishes.
 
+Chronological organization shows a project-initial badge to the left of each thread,
+with the full project name on hover. Use
+`bb thread-list prefs set organizationMode chronological` to list threads across
+projects without project headers.
+
 Organize → Rows → Provider icons toggles the icon before each thread title.
 `showProviderIcons` defaults to `true`; use
 `bb thread-list prefs set showProviderIcons false` to hide them. Unknown

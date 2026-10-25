@@ -64,6 +64,7 @@ import {
 } from "../list/sidebarDraftPresence.js";
 import { useSidebarProjectName } from "../model/use-sidebar-data.js";
 import {
+  sidebarOrganizationModeAtom,
   sidebarShowProviderIconsAtom,
   threadRowActionsAtom,
 } from "../preferences/atoms.js";
@@ -389,6 +390,18 @@ function ThreadRowComponent({
   const selectionHidesActive = useIsSelectionHidingActiveRow(isActive);
   const multiSelection = useMultiSelectionContaining(thread.id);
   const showProviderIcons = useAtomValue(sidebarShowProviderIconsAtom);
+  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
+  const projectName = useSidebarProjectName(thread.projectId);
+  const projectBadge =
+    organizationMode === "chronological" && projectName
+      ? projectName
+          .trim()
+          .split(/\s+/u)
+          .slice(0, 2)
+          .map((word) => Array.from(word)[0])
+          .join("")
+          .toLocaleUpperCase()
+      : null;
   const providers = useContext(SidebarProvidersContext);
   const provider = showProviderIcons
     ? providers.find((candidate) => candidate.id === thread.providerId)
@@ -685,6 +698,26 @@ function ThreadRowComponent({
               "flex-1",
           )}
         >
+          {projectBadge ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  data-sidebar-thread-project={thread.projectId}
+                  role="img"
+                  aria-label={`In project ${projectName}`}
+                  className="pointer-events-auto relative z-[31] mr-1.5 flex size-5 shrink-0 items-center justify-center rounded bg-muted text-xs font-medium text-muted-foreground"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    rowLinkRef.current?.click();
+                  }}
+                >
+                  {projectBadge}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">{projectName}</TooltipContent>
+            </Tooltip>
+          ) : null}
           {provider ? (
             <Tooltip>
               <TooltipTrigger asChild>
