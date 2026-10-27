@@ -128,7 +128,7 @@ describe("thread-list preferences rpc", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("defaults row actions to archive, migrates bare ids, dedupes them, and rejects malformed or too many keys", async () => {
+  it("defaults row actions to complete, migrates bare ids, dedupes them, and rejects malformed or too many keys", async () => {
     const { bb, harness } = setup();
     await plugin(bb);
     const listed = (await harness.behavior.callRpc(
@@ -137,7 +137,7 @@ describe("thread-list preferences rpc", () => {
     )) as {
       preferences: { rowActions: string[] };
     };
-    expect(listed.preferences.rowActions).toEqual(["bb--core/archive"]);
+    expect(listed.preferences.rowActions).toEqual(["thread-list/complete"]);
     await expect(
       harness.behavior.callRpc("setPreference", {
         key: "rowActions",
@@ -457,27 +457,44 @@ describe("queued thread promotion", () => {
     expect(harness.sdk.callsTo("threads.update")).toEqual([]);
   });
 
-  it("returns a finished Active thread to the queue without changing manual order", async () => {
-    const { harness, thread } = await promotionHost();
-    const finished = {
-      ...thread,
-      status: "idle" as const,
-      sectionId: "sec_active",
-    };
-    harness.sdk.stub("threads.get", async () => finished);
-    await harness.behavior.emitThreadEvent("thread.idle", {
-      thread: finished,
-      lastAssistantText: "Done",
-    });
-    expect(harness.sdk.callsTo("threads.update")).toEqual([
-      [{ threadId: thread.id, sectionId: null }],
-    ]);
-    expect(
-      await harness.behavior.callRpc("listPreferences", null),
-    ).toMatchObject({
-      preferences: { manualThreadOrder: ["existing", "queued", "other"] },
-    });
-  });
+  it.each([
+    ["existing", "queued", "other"],
+    ["existing", "other"],
+  ])(
+    "returns a finished Active thread to the top of Queued with saved order %j",
+    async (...order) => {
+      const { harness, thread } = await promotionHost();
+      for (const [key, value] of [
+        ["manualThreadOrder", order],
+        ["chronologicalSort", "updated"],
+        ["groupByReadStatus", true],
+      ] as const) {
+        await harness.behavior.callRpc("setPreference", { key, value });
+      }
+      const finished = {
+        ...thread,
+        status: "idle" as const,
+        sectionId: "sec_active",
+      };
+      harness.sdk.stub("threads.get", async () => finished);
+      await harness.behavior.emitThreadEvent("thread.idle", {
+        thread: finished,
+        lastAssistantText: "Done",
+      });
+      expect(harness.sdk.callsTo("threads.update")).toEqual([
+        [{ threadId: thread.id, sectionId: null }],
+      ]);
+      expect(
+        await harness.behavior.callRpc("listPreferences", null),
+      ).toMatchObject({
+        preferences: {
+          manualThreadOrder: ["queued", "existing", "other"],
+          chronologicalSort: "manual",
+          groupByReadStatus: false,
+        },
+      });
+    },
+  );
 
   it.each([
     { sectionId: "sec_completed" },

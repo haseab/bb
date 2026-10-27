@@ -24,6 +24,7 @@ import { Icon } from "@/components/ui/icon";
 import type { SidebarThread } from "../model/sidebar-thread.js";
 import { useSidebarData } from "../model/use-sidebar-data.js";
 import { useMoveDestinations } from "../rows/moveThreadAction.js";
+import { useThreadCompletion } from "../rows/completeThreadAction.js";
 import { useThreadSelectionStore } from "./threadSelection.js";
 
 import { moveThreadToSection } from "../rows/moveThreadToSection.js";
@@ -55,6 +56,7 @@ function ThreadSelectionMenuItems({
   threadIds: readonly string[];
 }) {
   const sdk = useSdk();
+  const completion = useThreadCompletion();
   const store = useThreadSelectionStore();
   const { projects } = useSidebarData();
   const destinations = useMoveDestinations();
@@ -190,6 +192,21 @@ function ThreadSelectionMenuItems({
       <ActionMenuItem surface={SURFACE} icon="X" onSelect={() => store.clear()}>
         Clear selection
       </ActionMenuItem>
+      {active.length > 0 ? (
+        <ActionMenuItem
+          surface={SURFACE}
+          icon="Check"
+          disabled={!completion.ready}
+          onSelect={() =>
+            void settleAll(
+              active.map((thread) => completion.setCompleted(thread.id, true)),
+              "Failed to complete some threads.",
+            )
+          }
+        >
+          Complete {describeThreads(active.length)}
+        </ActionMenuItem>
+      ) : null}
       {active.length > 0 ? (
         <ActionMenuItem
           surface={SURFACE}

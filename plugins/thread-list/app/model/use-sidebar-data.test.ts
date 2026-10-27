@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeSidebarThread } from "./fixtures.js";
+import { makePluginProject, makeSidebarThread } from "./fixtures.js";
 import {
   buildSidebarData,
   getSidebarData,
@@ -145,5 +145,77 @@ describe("buildSidebarData structural sharing", () => {
       data,
     );
     resetSidebarDataCacheForTest();
+  });
+});
+
+describe("optimistic Active section placement", () => {
+  const section = { id: "active", name: "Active", createdAt: 1, updatedAt: 1 };
+  const project = makePluginProject();
+  const queued = makeSidebarThread({ id: "queued", projectId: project.id });
+  const state = {
+    status: "ready" as const,
+    experimental_archived: null,
+    threads: [queued],
+    projects: [project],
+    sections: [section],
+  };
+
+  it("moves immediately on predicted activity, reverts on failure, and reconciles confirmation without duplicates", () => {
+    resetSidebarDataCacheForTest();
+    const before = getSidebarData(state, section.id);
+    expect(before.projects[0]?.threads[0]?.sectionId).toBeNull();
+    const sending = {
+      ...state,
+      threads: [{ ...queued, status: "active" as const }],
+    };
+    const optimistic = getSidebarData(sending, section.id);
+    expect(optimistic.projects[0]?.threads).toHaveLength(1);
+    expect(optimistic.projects[0]?.threads[0]?.sectionId).toBe(section.id);
+    expect(sending.threads[0]?.sectionId).toBeNull();
+    expect(
+      getSidebarData(state, section.id).projects[0]?.threads[0]?.sectionId,
+    ).toBeNull();
+    const confirmed = getSidebarData(
+      {
+        ...sending,
+        threads: [{ ...sending.threads[0]!, sectionId: section.id }],
+      },
+      section.id,
+    );
+    expect(confirmed.projects[0]?.threads).toHaveLength(1);
+    expect(confirmed.projects[0]?.threads[0]?.sectionId).toBe(section.id);
+  });
+
+  it.each([
+    { status: "idle" as const },
+    { status: "pending" as const },
+    { sectionId: "other" },
+    { parentThreadId: "parent" },
+    { pinnedAt: 1, isPinned: true },
+    { archivedAt: 1, isArchived: true },
+  ])("preserves existing placement for %j", (overrides) => {
+    const thread = makeSidebarThread({
+      ...queued,
+      status: "active",
+      ...overrides,
+    });
+    const data = getSidebarData({ ...state, threads: [thread] }, section.id);
+    expect(data.projects[0]?.threads[0]).toBe(thread);
+  });
+
+  it("updates placement when the rule changes and ignores missing sections", () => {
+    const sending = {
+      ...state,
+      threads: [{ ...queued, status: "active" as const }],
+    };
+    expect(
+      getSidebarData(sending, section.id).projects[0]?.threads[0]?.sectionId,
+    ).toBe(section.id);
+    expect(
+      getSidebarData(sending, null).projects[0]?.threads[0]?.sectionId,
+    ).toBeNull();
+    expect(
+      getSidebarData(sending, "missing").projects[0]?.threads[0]?.sectionId,
+    ).toBeNull();
   });
 });

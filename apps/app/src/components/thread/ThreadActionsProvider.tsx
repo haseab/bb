@@ -47,6 +47,7 @@ import {
   ThreadArchiveDialog,
   type ThreadArchiveDialogTarget,
 } from "@/components/dialogs/ThreadArchiveDialog";
+import { useArchiveUndo } from "./useArchiveUndo";
 import { ArchivedThreadToastDescription } from "@/components/thread/ArchivedThreadToastDescription";
 import { destroyPersistedBrowserViewsForThread } from "@/components/secondary-panel/browserViewVisibilityCoordinator";
 import { getThreadReadToggleAction } from "@bb/client-core";
@@ -110,6 +111,7 @@ export function ThreadActionsProvider({
   const confirmThreadArchive =
     useSystemConfig().data?.generalSettings.confirmThreadArchive ?? true;
   const navigate = useRouteNavigate();
+  const registerArchiveUndo = useArchiveUndo();
   const queryClient = useQueryClient();
   const location = useLocation();
   const viewedRoute = `${location.pathname}${location.search}${location.hash}`;
@@ -358,15 +360,16 @@ export function ThreadActionsProvider({
           : null;
         const previousRoute = viewedRouteRef.current;
         if (destination !== null) viewedRouteRef.current = destination;
+        const toastId = `environment-archived-${environmentId}`;
         appToast.success(
           response.archivedThreadIds.length === 1
             ? "Thread archived"
             : "Threads archived",
           {
             description: `Archived ${response.archivedThreadIds.length} ${response.archivedThreadIds.length === 1 ? "thread" : "threads"}`,
-            cancel: {
-              label: "Undo",
-              onClick: () => {
+            ...registerArchiveUndo(
+              toastId,
+              () => {
                 void (async () => {
                   try {
                     for (const threadId of [
@@ -386,9 +389,10 @@ export function ThreadActionsProvider({
                   }
                 })();
               },
-            },
+              ARCHIVE_UNDO_TOAST_DURATION_MS,
+            ),
             duration: ARCHIVE_UNDO_TOAST_DURATION_MS,
-            id: `environment-archived-${environmentId}`,
+            id: toastId,
           },
         );
       } catch (error) {
@@ -400,6 +404,7 @@ export function ThreadActionsProvider({
       }
     },
     [
+      registerArchiveUndo,
       archiveEnvironmentMutateAsync,
       queryClient,
       closePanesForThreads,
@@ -458,9 +463,9 @@ export function ThreadActionsProvider({
                 }}
               />
             ),
-            cancel: {
-              label: "Undo",
-              onClick: () => {
+            ...registerArchiveUndo(
+              toastId,
+              () => {
                 const shouldReturnToThread =
                   archiveDestination !== null &&
                   viewedRouteRef.current === archiveDestination;
@@ -478,7 +483,8 @@ export function ThreadActionsProvider({
                   );
                 }
               },
-            },
+              ARCHIVE_UNDO_TOAST_DURATION_MS,
+            ),
             duration: ARCHIVE_UNDO_TOAST_DURATION_MS,
             id: toastId,
           });
@@ -501,6 +507,7 @@ export function ThreadActionsProvider({
       );
     },
     [
+      registerArchiveUndo,
       archiveThreadAndChildrenMutateAsync,
       openArchiveDialog,
       closePanesForThreads,

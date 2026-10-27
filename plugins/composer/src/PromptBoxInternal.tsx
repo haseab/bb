@@ -1962,10 +1962,17 @@ export function PromptBoxInternal({
           event.preventDefault();
           if (pastedValue.text.length === 0) return true;
 
+          const markdownContent =
+            promptEditorContentFromValue(pastedValue).content ?? [];
+          const pastedContent =
+            markdownContent.length === 1 &&
+            markdownContent[0]?.type === "paragraph"
+              ? (markdownContent[0].content ?? [])
+              : markdownContent;
           editorRef.current
             ?.chain()
             .focus()
-            .insertContent(promptEditorInlineContentFromValue(pastedValue))
+            .insertContent(pastedContent)
             .setMeta("uiEvent", "paste")
             .setMeta(promptThreadLinkPasteKey, threadLinkMetadata(pastedValue))
             .run();

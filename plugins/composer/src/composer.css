@@ -8,6 +8,49 @@
     border-color: var(--pill-surface-selected-border);
   }
 
+  [data-promptbox-editor-content] .ProseMirror :where(h1, h2, h3, h4, h5, h6) {
+    margin-block: 0.25em;
+    font-size: inherit;
+    font-weight: 600;
+    line-height: inherit;
+  }
+
+  [data-promptbox-editor-content] .ProseMirror :where(ul, ol) {
+    margin-block: 0.25em;
+    padding-inline-start: 1.25em;
+  }
+
+  [data-promptbox-editor-content] .ProseMirror ul {
+    list-style-type: disc;
+  }
+  [data-promptbox-editor-content] .ProseMirror ol {
+    list-style-type: decimal;
+  }
+
+  [data-promptbox-editor-content] .ProseMirror :where(pre, code) {
+    font-family: var(--font-mono, monospace);
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  [data-promptbox-editor-content] .ProseMirror pre {
+    margin-block: 0.25em;
+    padding: 0.5em;
+    overflow-x: auto;
+    border-radius: 0.25rem;
+    background: var(--surface-raised);
+    white-space: pre;
+  }
+
+  [data-promptbox-editor-content] .ProseMirror a {
+    text-decoration: underline;
+  }
+
+  [data-promptbox-editor-content] .ProseMirror hr {
+    margin-block: 0.5em;
+    border-top: 1px solid var(--border);
+  }
+
   [data-promptbox-compact-content] .ProseMirror[contenteditable] {
     width: 100%;
     min-height: 0 !important;
@@ -20,7 +63,7 @@
   [data-promptbox-compact-content] .ProseMirror[contenteditable] > *,
   [data-promptbox-compact-content]
     .ProseMirror[contenteditable]
-    :where(blockquote, p) {
+    :where(blockquote, p, h1, h2, h3, h4, h5, h6, ul, ol, li, pre) {
     display: inline;
     margin: 0;
     padding: 0;
@@ -39,7 +82,7 @@
     + *::before,
   [data-promptbox-compact-content]
     .ProseMirror[contenteditable]
-    :where(blockquote)
+    :where(blockquote, ul, ol, li)
     > *
     + *::before {
     content: " ";
@@ -156,7 +199,7 @@
   [data-promptbox][data-promptbox-collapsed]:not([data-promptbox-voice-active])
     [data-promptbox-editor-content]
     .ProseMirror[contenteditable]
-    :where(blockquote, p) {
+    :where(blockquote, p, h1, h2, h3, h4, h5, h6, ul, ol, li, pre) {
     display: inline;
     margin: 0;
     padding: 0;
@@ -177,7 +220,7 @@
   [data-promptbox][data-promptbox-collapsed]:not([data-promptbox-voice-active])
     [data-promptbox-editor-content]
     .ProseMirror[contenteditable]
-    :where(blockquote)
+    :where(blockquote, ul, ol, li)
     > *
     + *::before {
     content: " ";

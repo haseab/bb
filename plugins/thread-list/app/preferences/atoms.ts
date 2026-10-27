@@ -48,8 +48,14 @@ export const sidebarThreadLifecyclesAtom =
 export const sidebarShowProviderIconsAtom =
   createSyncedPreferenceAtom("showProviderIcons");
 
+export const sidebarAutoActiveSectionIdAtom = createSyncedPreferenceAtom(
+  "autoActiveSectionId",
+);
+
 export const sidebarManualThreadOrderAtom =
   createSyncedPreferenceAtom("manualThreadOrder");
+export const sidebarCompletedSectionIdAtom =
+  createSyncedPreferenceAtom("completedSectionId");
 export const sidebarThreadsSectionLabelAtom = createSyncedPreferenceAtom(
   "threadsSectionLabel",
 );

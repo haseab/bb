@@ -44,6 +44,10 @@ import {
   getMutationErrorMessage,
 } from "../ui/mutation-errors.js";
 import { cn } from "@/lib/utils";
+import { buildSectionKey } from "../model/section-keys.js";
+import { partitionCompletedThreads } from "../model/completedThreads.js";
+import { sidebarCompletedSectionIdAtom } from "../preferences/atoms.js";
+import { TopLevelSidebarSection } from "./TopLevelSidebarSection.js";
 import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
 import {
   ConfirmDeleteDialog,
@@ -99,6 +103,7 @@ import {
   sidebarGroupThreadsByEnvironmentAtom,
   sidebarSortDirectionAtom,
   sidebarCollapsedMachinesAtom,
+  sidebarCollapsedThreadSectionsAtom,
   sidebarManualSectionOrderAtom,
   sidebarOrganizationModeAtom,
 } from "../preferences/atoms.js";
@@ -1327,6 +1332,29 @@ function ProjectListComponent({
     () => projects.flatMap((project) => project.threads),
     [projects],
   );
+  const completedSectionId = useAtomValue(sidebarCompletedSectionIdAtom);
+  const completedSection = sections.find(
+    (section) => section.id === completedSectionId,
+  );
+  const completedSectionKey = completedSection
+    ? buildSectionKey(CHRONOLOGICAL_CONTAINER_ID, completedSection.id)
+    : "";
+  const completedPartition = useMemo(
+    () => partitionCompletedThreads(threads, completedSection?.id ?? null),
+    [threads, completedSection?.id],
+  );
+  const groupedProjects = useMemo(() => {
+    const remainingIds = new Set(
+      completedPartition.remaining.map((thread) => thread.id),
+    );
+    return projects.map((project) => ({
+      ...project,
+      threads: project.threads.filter((thread) => remainingIds.has(thread.id)),
+    }));
+  }, [projects, completedPartition]);
+  const [collapsedCompletedSections, setCollapsedCompletedSections] = useAtom(
+    sidebarCollapsedThreadSectionsAtom,
+  );
   const preferencesReady = usePreferencesReady();
   const threadListStatus = toThreadListStatus(status);
   const selectedThreadId = activeThreadId ?? undefined;
@@ -1727,7 +1755,7 @@ function ProjectListComponent({
           mode={organizationMode}
           renderMachine={() => (
             <MachineModeSections
-              threads={threads}
+              threads={[...completedPartition.remaining]}
               effectivePinnedThreadIds={
                 pinnedSidebarState.effectivePinnedThreadIds
               }
@@ -1787,8 +1815,8 @@ function ProjectListComponent({
           renderProject={() => (
             <ProjectModeSections
               personalProjectId={personalProjectId}
-              projects={projects}
-              threads={threads}
+              projects={groupedProjects}
+              threads={[...completedPartition.remaining]}
               effectivePinnedThreadIds={
                 pinnedSidebarState.effectivePinnedThreadIds
               }
@@ -1814,6 +1842,47 @@ function ProjectListComponent({
             />
           )}
         />
+        {organizationMode !== "chronological" && completedSection && (
+          <TopLevelSidebarSection
+            label={completedSection.name}
+            sectionId={`section:${completedSection.id}`}
+            collapsedThreads={completedPartition.completed}
+            collapsedActivity={getCollapsedChildActivity(
+              completedPartition.completed,
+            )}
+            collapseControl={{
+              isCollapsed:
+                collapsedCompletedSections.includes(completedSectionKey),
+              onToggleCollapsed: () =>
+                setCollapsedCompletedSections((ids) =>
+                  ids.includes(completedSectionKey)
+                    ? ids.filter((id) => id !== completedSectionKey)
+                    : [...ids, completedSectionKey],
+                ),
+            }}
+          >
+            {!collapsedCompletedSections.includes(completedSectionKey) && (
+              <ProjectThreadTree
+                threadListState={getProjectThreadListState({
+                  status: threadListStatus,
+                  threads: completedPartition.completed.filter(
+                    (thread) =>
+                      !pinnedSidebarState.effectivePinnedThreadIds.has(
+                        thread.id,
+                      ),
+                  ),
+                })}
+                selectedThreadId={selectedThreadId}
+                collapsedThreadIds={collapsedThreadIds}
+                collapsedEnvironmentIds={collapsedEnvironmentIds}
+                compareThreads={sidebarThreadComparator}
+                onProjectSelect={onProjectSelect}
+                onToggleThreadCollapsed={toggleThreadCollapsed}
+                onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
+              />
+            )}
+          </TopLevelSidebarSection>
+        )}
         {archived !== null && (
           <>
             {status === "ready" && archived.status !== "ready" && (

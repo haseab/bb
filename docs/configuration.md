@@ -249,8 +249,11 @@ changed from the saved setting wins. Codex memory and native subagents live on
 the Codex provider plugin; Claude Code's options are under
 [Claude Code provider](#claude-code-provider).
 
-**Composer keys.** The prompt box uses plain-text editing; Markdown delimiters
-stay visible. Outside an open typeahead menu, Shift+Enter inserts a newline. On
+**Composer keys.** The bundled Composer plugin renders Markdown as editable
+formatting, while drafts and sent prompts remain Markdown text. Headings keep
+the composer font size. Command/Control+B toggles bold, Command/Control+I toggles
+italic, and Command/Control+E toggles inline code. Outside an open typeahead
+menu, Shift+Enter inserts a newline. On
 coarse-pointer touch devices, the software-keyboard Return inserts a newline
 and the submit button sends; iPadOS WebKit keeps the Enter and Command+Enter
 shortcuts for a connected Magic Keyboard.
@@ -1117,9 +1120,19 @@ row's Customize actions, or `bb thread-list prefs get|set|reset <key>`
 | `sectionOrder`        | `["pinned","projects","threads"]` | Top-level order by project; `manualSectionOrder` and `machineSectionOrder` cover the other modes                                            |
 | `hiddenGroups`        | `[]`                              | Groups moved into More: `threads`, `project:<id>`, `section:<id>`, `machine:<hostId>` (`machine:no-machine`); `set` replaces the whole list |
 | `threadLifecycles`    | `["active"]`                      | `["active"]`, `["archived"]`, or both; empty and duplicate values are rejected                                                              |
-| `rowActions`          | `["bb--core/archive"]`            | Up to three thread action keys in display order; see below                                                                                  |
+| `rowActions`          | `["thread-list/complete"]`        | Up to three thread action keys in display order; see below                                                                                  |
 | `showProviderIcons`   | `false`                           | Shows the provider icon before each thread title                                                                                            |
 | `collapsed*`          | `[]`                              | Collapsed sections, projects, threads, environments, custom sections, and machines                                                          |
+
+Complete in a thread's menu moves it to Completed; Reopen returns it to the
+unsectioned queue. Command+Enter completes the focused sidebar thread
+(Control+Enter off macOS), rebindable as `plugin:thread-list/complete`.
+`bb thread-list complete <thread-id>` and `reopen <thread-id>` expose the same
+action, as does the plugin's `setCompleted` RPC with `{threadId, completed}`.
+`completedSectionId` (default `null`) stores the adopted or newly created
+Completed section id after first use. Completed has its own group in every
+organization. Completion unpins and detaches the selected thread but preserves
+its children, history, running agent, and environment. Archive stays separate.
 
 `chronologicalSort: "manual"` uses `manualThreadOrder` (default `[]`) to keep
 threads in a saved order across status and activity changes. Option+Up/Down

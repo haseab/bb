@@ -19,6 +19,7 @@ import {
   sidebarCollapsedMachinesAtom,
   sidebarCollapsedThreadSectionsAtom,
   sidebarOrganizationModeAtom,
+  sidebarCompletedSectionIdAtom,
 } from "../preferences/atoms.js";
 import { usePreferencesReady } from "../preferences/PreferencesSync.js";
 import { useExpandThreadAncestors } from "./useReadStatusGrouping.js";
@@ -189,6 +190,7 @@ export function stepSidebarThreadReveal(
 }
 
 interface ThreadRevealExpansionArgs {
+  completedSectionId: string | null;
   thread: SidebarThread;
   threadById: ReadonlyMap<string, SidebarThread>;
   effectivePinnedThreadIds: ReadonlySet<string>;
@@ -197,6 +199,7 @@ interface ThreadRevealExpansionArgs {
 }
 
 export function resolveThreadRevealExpansion({
+  completedSectionId,
   thread,
   threadById,
   effectivePinnedThreadIds,
@@ -207,7 +210,16 @@ export function resolveThreadRevealExpansion({
   const environmentIdsToExpand = new Set<string>();
   let currentThread: SidebarThread | undefined = thread;
   let remainingHops = threadById.size;
+  let completedSectionKey: string | null = null;
   while (currentThread && remainingHops > 0) {
+    if (
+      completedSectionId !== null &&
+      currentThread.sectionId === completedSectionId
+    )
+      completedSectionKey = sectionKeyForThreadSection(
+        CHRONOLOGICAL_CONTAINER_ID,
+        completedSectionId,
+      );
     const environmentId = currentThread.environment?.id ?? null;
     if (environmentId !== null) {
       environmentIdsToExpand.add(environmentId);
@@ -224,13 +236,16 @@ export function resolveThreadRevealExpansion({
     currentThread = parentThread;
     remainingHops -= 1;
   }
-  const expansion = getThreadSidebarExpansion({
-    organizationMode,
-    isPinned: effectivePinnedThreadIds.has(thread.id),
-    thread,
-    sidebarProjectId: resolveSidebarProjectId(thread, threadById),
-    personalProjectId,
-  });
+  const expansion =
+    completedSectionKey && !effectivePinnedThreadIds.has(thread.id)
+      ? { sectionKey: completedSectionKey }
+      : getThreadSidebarExpansion({
+          organizationMode,
+          isPinned: effectivePinnedThreadIds.has(thread.id),
+          thread,
+          sidebarProjectId: resolveSidebarProjectId(thread, threadById),
+          personalProjectId,
+        });
   return { threadIdsToExpand, environmentIdsToExpand, expansion };
 }
 
@@ -250,6 +265,7 @@ function useSidebarThreadRevealCore({
   personalProjectId,
 }: SidebarThreadRevealInputs): void {
   const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
+  const completedSectionId = useAtomValue(sidebarCompletedSectionIdAtom);
   const expandThreadAncestors = useExpandThreadAncestors();
   const setCollapsedEnvironmentIdList = useSetAtom(collapsedEnvironmentIdsAtom);
   const setCollapsedProjectIdList = useSetAtom(collapsedProjectIdsAtom);
@@ -286,6 +302,7 @@ function useSidebarThreadRevealCore({
       }
       const { threadIdsToExpand, environmentIdsToExpand, expansion } =
         resolveThreadRevealExpansion({
+          completedSectionId,
           thread,
           threadById,
           effectivePinnedThreadIds,
@@ -331,6 +348,7 @@ function useSidebarThreadRevealCore({
     preferencesReady,
     personalProjectId,
     organizationMode,
+    completedSectionId,
     threads,
     threadById,
     effectivePinnedThreadIds,

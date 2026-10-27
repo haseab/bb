@@ -330,6 +330,9 @@ function hostThreadActions({
     });
     const isArchived = thread.archivedAt !== null;
     return [
+      ...(!isArchived
+        ? [entry("thread-list/complete", "Complete", "Check")]
+        : []),
       entry("bb--core/copyLink", "Copy link", "Copy"),
       entry(
         "bb--core/pin",
@@ -1248,7 +1251,7 @@ describe("ThreadRow", () => {
         ),
       ).toEqual([
         toggle.getAttribute("aria-label"),
-        "Archive",
+        "Complete",
         "Thread actions",
       ]);
       fireEvent.click(toggle);

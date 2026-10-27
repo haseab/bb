@@ -1,3 +1,18 @@
+import Bold from "@tiptap/extension-bold";
+import Italic from "@tiptap/extension-italic";
+import Code from "@tiptap/extension-code";
+import CodeBlock from "@tiptap/extension-code-block";
+import Heading from "@tiptap/extension-heading";
+import HorizontalRule from "@tiptap/extension-horizontal-rule";
+import Link from "@tiptap/extension-link";
+import Strike from "@tiptap/extension-strike";
+import {
+  BulletList,
+  OrderedList,
+  ListItem,
+  ListKeymap,
+} from "@tiptap/extension-list";
+import { Extension } from "@tiptap/core";
 import { Placeholder } from "@tiptap/extensions/placeholder";
 import Blockquote from "@tiptap/extension-blockquote";
 import Document from "@tiptap/extension-document";
@@ -23,13 +38,67 @@ export function promptEditorExtensions({
   onRuleError,
 }: PromptEditorExtensionsOptions): AnyExtension[] {
   return [
+    Bold,
+    Italic,
+    Code,
+    CodeBlock,
+    Heading,
+    HorizontalRule,
+    Link.configure({
+      openOnClick: false,
+      autolink: false,
+      linkOnPaste: false,
+      shouldAutoLink: () => false,
+    }),
+    Strike,
+    BulletList,
+    OrderedList,
+    ListItem,
+    ListKeymap,
+    Extension.create({
+      name: "promptMarkdownSource",
+      addGlobalAttributes() {
+        return [
+          {
+            types: [
+              "paragraph",
+              "heading",
+              "blockquote",
+              "bulletList",
+              "orderedList",
+              "listItem",
+              "codeBlock",
+              "horizontalRule",
+            ],
+            attributes: {
+              markdownBefore: { default: null, rendered: false },
+              markdownPrefix: { default: null, rendered: false },
+            },
+          },
+          {
+            types: ["bold", "italic", "strike", "code"],
+            attributes: {
+              markdownDelimiter: { default: null, rendered: false },
+            },
+          },
+        ];
+      },
+    }),
     Blockquote,
     Document,
     HardBreak,
     UndoRedo,
     Paragraph,
     Text,
-    TrailingNode,
+    TrailingNode.configure({
+      notAfter: [
+        "bulletList",
+        "orderedList",
+        "codeBlock",
+        "heading",
+        "horizontalRule",
+      ],
+    }),
     Placeholder.configure({
       placeholder: () => getPlaceholder(),
     }),

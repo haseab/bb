@@ -29,6 +29,7 @@ import {
   type PreferenceValues,
 } from "./shared/preferences.js";
 
+import { threadCompletionCommand } from "./app/pipeline/threadCompletionCommand.js";
 import { threadPipelineCommands } from "./app/pipeline/threadPipelineCommands.js";
 
 const app = await loadPluginApp(() => import("./app"));
@@ -161,6 +162,69 @@ afterEach(() => {
 });
 
 describe("thread-list plugin", () => {
+  it("completes the focused selector rather than the open thread, and ignores editors", async () => {
+    setPreferencesMirrorStorageForTest(null);
+    const setCompleted = vi.fn((input: unknown) => input);
+    renderList(
+      {},
+      {
+        rpc: {
+          listPreferences: () => ({ preferences: defaultPreferences() }),
+          setCompleted,
+        },
+      },
+    );
+    await screen.findByText("Parent thread");
+    const context = {
+      threadId: "thr_parent",
+      projectId: "proj_app",
+      openPanel: () => false,
+    };
+    const selected = document.querySelector<HTMLAnchorElement>(
+      'a[data-sidebar-thread-id="thr_later"]',
+    )!;
+    selected.focus();
+    await waitFor(() =>
+      expect(threadCompletionCommand.isAvailable?.(context)).toBe(true),
+    );
+    await act(async () => threadCompletionCommand.run(context));
+    expect(setCompleted).toHaveBeenCalledWith({
+      threadId: "thr_later",
+      completed: true,
+    });
+    const editor = document.createElement("textarea");
+    document.body.append(editor);
+    editor.focus();
+    expect(threadCompletionCommand.isAvailable?.(context)).toBe(false);
+    await act(async () => threadCompletionCommand.run(context));
+    expect(setCompleted).toHaveBeenCalledTimes(1);
+    editor.remove();
+    expect(threadCompletionCommand.defaultShortcut).toEqual({
+      key: "Enter",
+      mod: true,
+    });
+  });
+
+  it.each(["chronological", "project", "machine"] as const)(
+    "keeps Completed threads in their own section in %s view",
+    async (organizationMode) => {
+      setPreferencesMirrorStorageForTest(null);
+      renderList({ organizationMode, completedSectionId: "sec_later" });
+      await waitFor(() => expect(sectionHeaders()).toContain("Later"));
+      const row = document.querySelector(
+        'a[data-sidebar-thread-id="thr_later"]',
+      )!;
+      expect(
+        row.closest(
+          '[data-sidebar-section-id="section:sec_later"], [data-sidebar-section-id="sec_later"]',
+        ),
+      ).not.toBeNull();
+      expect(
+        document.querySelectorAll('a[data-sidebar-thread-id="thr_later"]'),
+      ).toHaveLength(1);
+    },
+  );
+
   it.each([
     ["section-up", "thr_parent", "sec_review"],
     ["section-down", "thr_later", "sec_review"],

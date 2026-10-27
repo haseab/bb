@@ -5,6 +5,33 @@ description: "Inspect or change the sidebar thread list's layout preferences: or
 
 # Thread list preferences
 
+## Complete and reopen threads
+
+Choose Complete from a thread's three-dot menu, or press Command+Enter
+(Control+Enter on other platforms) while the sidebar selector is on that thread.
+The command is `plugin:thread-list/complete` and can be rebound in Settings →
+Keyboard. It only acts on the focused sidebar row, leaving composer submission
+unchanged. Completed rows offer Reopen to return to the unsectioned queue.
+The default row quick action is Complete; Archive remains a separate menu action.
+
+```sh
+bb thread-list complete <thread-id> [--json]
+bb thread-list reopen <thread-id> [--json]
+```
+
+The first completion adopts an existing Completed section or creates one, saving
+its id in `completedSectionId` (default `null`). Completed is shown separately
+in every organization mode. Completion uses core section placement: it unpins
+and detaches the selected thread, keeping its children beneath it. It does not
+stop a run, archive its environment, or remove its history. Moving a thread out
+of this section also reopens it. Archived threads must be unarchived first.
+Existing archived threads are left archived.
+
+SDK clients use `bb.sdk.plugins.callRpc` with plugin id `thread-list`, method
+`setCompleted`, and input `{ threadId, completed: true }` (or `false` to reopen).
+The typed `threadListRpcContract` exposes the same operation used by menus,
+keyboard, and CLI. It returns `{ threadId, sectionId }`.
+
 The Thread list plugin owns the sidebar's layout state. Read it with
 `bb thread-list prefs list --json`; keys are `showProviderIcons`, `threadLifecycles`, `organizationMode`,
 `environmentGrouping`, `groupByReadStatus`, `chronologicalSort`, `sortDirection`, `sectionOrder`,
@@ -61,9 +88,9 @@ of the list. The same preference is available through `setPreference` RPC.
 hover, left to right before its actions menu, as thread action keys: bb's
 `bb--core/split`, `bb--core/copyLink`, `bb--core/read`, `bb--core/pin`,
 `bb--core/rename`, `bb--core/archive`, `bb--core/delete`, the list's
-`thread-list/move` (opens a section menu), or another plugin's
+`thread-list/move` (opens a section menu), `thread-list/complete`, or another plugin's
 `<pluginId>/<actionId>`. Bare legacy ids such as `archive` and `core/<id>`
-keys still work. The default is `'["bb--core/archive"]'` and `'[]'` leaves
+keys still work. The default is `'["thread-list/complete"]'` and `'[]'` leaves
 only the menu. For example,
 `bb thread-list prefs set rowActions '["bb--core/pin","bb--core/archive"]'`.
 In the app, a thread
@@ -127,7 +154,8 @@ The default is `null` (disabled). The backend rechecks current placement and onl
 promotes unsectioned, unpinned, unarchived root threads. It prepends the thread to
 manual order, selects Manual sorting, and disables read-status grouping so the
 newly active thread appears at the top. When a thread in that Active section becomes
-idle, it returns to the unsectioned queue without changing manual order. Threads
+idle, it returns to the top of the unsectioned queue, selecting Manual sorting
+and disabling read-status grouping so it stays first. Threads
 in Completed or another section stay there, including after another run. The
 backend rereads current status and placement before moving a thread, so stale
 finish events do not move a newly running thread or override a manual move.
