@@ -277,8 +277,8 @@ describe("ProjectsSettingsSection", () => {
     expect(screen.getByText("3 threads")).toBeDefined();
     expect(screen.getByText("1 of 2 machines")).toBeDefined();
     expect(screen.getByText("No git remote")).toBeDefined();
-    expect(screen.getByText("Not set up on any machine")).toBeDefined();
-    expect(screen.getByText("needs setup")).toBeDefined();
+    expect(screen.getByText("No folders attached")).toBeDefined();
+    expect(screen.getByText("No folders")).toBeDefined();
     expect(screen.queryByText("Personal")).toBeNull();
     expect(
       screen
@@ -373,7 +373,7 @@ describe("ProjectsSettingsSection", () => {
     );
   });
 
-  it("opens the add-project dialog with the paired machines listed", async () => {
+  it("creates a project by name without choosing a machine or folder", async () => {
     stubSidebarBootstrapFetch(projects);
 
     renderSection();
@@ -381,7 +381,7 @@ describe("ProjectsSettingsSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add a project" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Add project" }),
+      await screen.findByRole("heading", { name: "Create project" }),
     ).toBeDefined();
     expect(screen.queryByText(/Every machine is offline/u)).toBeNull();
   });

@@ -22,3 +22,10 @@ Start a thread, pick Codex, and let it write and review code in your repository 
 - Install the Codex CLI (`codex`) on the host machine, version 0.136.0 or newer. The plugin can run the npm install for you.
 - Sign in with `codex login` on that machine. A ChatGPT account or an OpenAI API key both work.
 - Usage limits show only for ChatGPT accounts.
+
+## Shared Codex conversations
+
+Local Codex conversations in your existing BB projects appear automatically and
+keep updating as you work in Codex. BB preserves the native conversation identity
+so replies continue the same session. Turn off Sync Codex conversations in the
+provider settings to stop discovery and refresh without removing existing threads.

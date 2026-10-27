@@ -1,3 +1,4 @@
+import { isNativeSessionActive } from "./native-session-sync.js";
 import {
   getEnvironment,
   getThread,
@@ -474,6 +475,13 @@ export async function sendThreadMessage(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: SendThreadMessageArgs,
 ): Promise<void> {
+  if (isNativeSessionActive(deps.db, args.thread.id)) {
+    throw new ApiError(
+      409,
+      "native_session_busy",
+      "This conversation is running in Codex. Wait for its turn to finish before replying in bb.",
+    );
+  }
   if (isStandaloneBuiltinClearCommand(args.payload.input)) {
     await clearThreadContext(deps, {
       environment: args.environment,

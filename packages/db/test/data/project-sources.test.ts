@@ -89,20 +89,28 @@ describe("project-sources", () => {
     ).toBe(initialDefault!.id);
   });
 
-  it("returns the source for a specific host", () => {
+  it("returns the selected default when a host has multiple folders", () => {
     const { db, project } = setup();
     const secondaryHost = upsertHost(db, noopNotifier, {
       name: "test-host-2",
     });
-    const secondarySource = createProjectSource(db, noopNotifier, {
+    createProjectSource(db, noopNotifier, {
       projectId: project.id,
       type: "local_path",
       hostId: secondaryHost.id,
       path: "/tmp/code-2",
     });
 
+    const preferred = createProjectSource(db, noopNotifier, {
+      projectId: project.id,
+      type: "local_path",
+      hostId: secondaryHost.id,
+      path: "/tmp/preferred",
+      isDefault: true,
+    });
+
     expect(getProjectSourceByHost(db, project.id, secondaryHost.id)?.id).toBe(
-      secondarySource.id,
+      preferred.id,
     );
   });
 
@@ -142,7 +150,7 @@ describe("project-sources", () => {
     expect(countProjectSources(db, { projectId: project.id })).toBe(2);
   });
 
-  it("rejects duplicate sources for the same project and host", () => {
+  it("rejects the same folder twice for a project and host", () => {
     const { db, host, project } = setup();
 
     expect(() =>
@@ -150,7 +158,7 @@ describe("project-sources", () => {
         projectId: project.id,
         type: "local_path",
         hostId: host.id,
-        path: "/tmp/duplicate",
+        path: "/tmp/test",
       }),
     ).toThrow();
     expect(listProjectSourcesByProjectIds(db, [project.id])).toHaveLength(1);

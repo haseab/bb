@@ -262,6 +262,7 @@ function upsertThreadTitleSearchSegments(
 }
 
 export interface CreateThreadInput {
+  creationSource?: "bb" | "native";
   projectId: string;
   environmentId?: string | null;
   providerId: string;
@@ -324,6 +325,7 @@ export function createThread(
           projectId: input.projectId,
           environmentId: input.environmentId ?? null,
           providerId: input.providerId,
+          creationSource: input.creationSource ?? "bb",
           title: input.title ?? null,
           titleFallback: input.titleFallback ?? null,
           sectionId: input.sectionId ?? null,

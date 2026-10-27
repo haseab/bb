@@ -11,6 +11,7 @@ function makeThread(
   overrides: Partial<ThreadListEntry> = {},
 ): ThreadListEntry {
   return {
+    creationSource: "bb",
     id,
     projectId: "project-1",
     environmentId: null,

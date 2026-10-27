@@ -371,6 +371,7 @@ export const themeCatalogResponseSchema = z.object({
 export type ThemeCatalogResponse = z.infer<typeof themeCatalogResponseSchema>;
 
 export const systemVersionResponseSchema = z.object({
+  localBuildVersion: z.string().min(1).nullable().optional(),
   currentCommit: z
     .string()
     .regex(/^[a-f0-9]{40}$/i)

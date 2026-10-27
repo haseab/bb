@@ -1,3 +1,4 @@
+import { NewThreadProjectFlow } from "./NewThreadProjectFlow";
 import { BrowserTabIcon } from "@/components/secondary-panel/BrowserTabIcon";
 import { getPanelTabHistoryKey } from "@/components/secondary-panel/recentlyClosedPanelTabs";
 import { appendQuoteAndAttachmentsToDraft } from "@bb/client-core";
@@ -474,6 +475,7 @@ function RootComposeSurface({
   const [, setPlacement] = useRootComposePlacement();
   const isPointerCoarse = usePointerCoarse();
   const quickCreateProject = useQuickCreateProjectController();
+  const [isChoosingProject, setIsChoosingProject] = useState(true);
   const {
     projectId,
     isProjectless,
@@ -1500,7 +1502,7 @@ function RootComposeSurface({
 
   const promptBox = renderPromptBox({
     id: "root-compose-prompt",
-    autoFocus: !isProviderCliBlocked,
+    autoFocus: !isChoosingProject && !isProviderCliBlocked,
     mentionMenuPlacement: isCompactViewport ? "top" : "bottom",
     banner: promptBanner,
     blockedReason:
@@ -1541,7 +1543,7 @@ function RootComposeSurface({
                   contentClassName={
                     ROOT_COMPOSE_SIDEBAR_ACTION_ALIGNED_TOP_PADDING_CLASS
                   }
-                  isCompactHomeLayout={isCompactViewport}
+                  isCompactHomeLayout={isCompactViewport && !isChoosingProject}
                   compactScrollContent={
                     <RootComposeMobileRecents
                       highlightedThreadId={lastCreatedThreadId}
@@ -1578,7 +1580,38 @@ function RootComposeSurface({
                     onPanelFocus: touchFixedPanelTabsState,
                   }}
                 >
-                  {promptBox}
+                  <NewThreadProjectFlow
+                    choosing={isChoosingProject}
+                    onChoosingChange={setIsChoosingProject}
+                    projects={projects}
+                    projectId={projectId}
+                    resetRequest={
+                      typeof location.state === "object" &&
+                      location.state !== null &&
+                      "chooseProject" in location.state &&
+                      location.state.chooseProject === true
+                        ? location.key
+                        : null
+                    }
+                    autoFocus={isFocusedPane}
+                    onSelectProject={async (nextProjectId) => {
+                      const outcome =
+                        await composer.changeProject(nextProjectId);
+                      if (outcome === "refused") {
+                        throw new Error(
+                          "The project could not be changed. Wait for pending uploads and try again.",
+                        );
+                      }
+                    }}
+                    onCompose={focusPromptBox}
+                    onCreateProject={quickCreateProject.openCreateDialog}
+                    canCreateProject={
+                      quickCreateProject.isAvailable &&
+                      !quickCreateProject.isCreating
+                    }
+                  >
+                    {promptBox}
+                  </NewThreadProjectFlow>
                 </RootComposeSecondaryContent>
               </PluginThreadPanelNavigationProvider>
             </AppNavigationHostProvider>

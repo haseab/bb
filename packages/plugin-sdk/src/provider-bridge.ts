@@ -434,3 +434,9 @@ export {
   type SkillScanRoot as ExperimentalSkillScanRoot,
   type IndexedSkillFile as ExperimentalIndexedSkillFile,
 } from "@bb/skill-index";
+
+export {
+  nativeSessionSnapshotSchema as experimental_nativeSessionSnapshotSchema,
+  type NativeSessionSnapshot as ExperimentalNativeSessionSnapshot,
+  type NativeSessionSyncResult as ExperimentalNativeSessionSyncResult,
+} from "@bb/provider-bridge-protocol";

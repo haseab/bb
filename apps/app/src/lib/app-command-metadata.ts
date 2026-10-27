@@ -40,7 +40,7 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
       command(
         "thread.new",
         "New thread",
-        "Start a thread in the active project.",
+        "Choose a project and start a thread.",
       ),
       command(
         "thread.search",
@@ -80,6 +80,11 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
         "Open quick palette",
         "Search and run bb commands from the keyboard.",
       ),
+      command(
+        "app.toggle",
+        "Show or hide bb",
+        "Globally show or hide the bb desktop app.",
+      ),
       command("window.new", "New window", "Open another bb desktop window."),
       command(
         "window.find",
@@ -101,6 +106,21 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
         "app.back",
         "Back to app",
         "Return from Settings, Plugins, Skills, or a plugin page with its own sidebar to the app.",
+      ),
+      command(
+        "sidebar.focus",
+        "Focus thread sidebar",
+        "Focus the selected thread in the sidebar.",
+      ),
+      command(
+        "chat.focus",
+        "Focus chat",
+        "Return keyboard focus to the chat area.",
+      ),
+      command(
+        "sidebar.archiveSelected",
+        "Archive selected sidebar thread",
+        "Archive the sidebar thread selected with the keyboard.",
       ),
       command("settings.open", "Open settings", "Open bb settings."),
       command(

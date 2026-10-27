@@ -523,14 +523,24 @@ export function registerProjectCommands(
       action(async (opts: ProjectCreateCommandOptions) => {
         const serverUrl = getUrl();
         const sdk = createCliBbSdk(serverUrl);
-        const hostId = await resolveProjectSourceHostId(opts, serverUrl);
-        const source = buildProjectSourceFromOptions({
-          hostId,
-          path: opts.root,
-        });
+        if (
+          opts.root === undefined &&
+          (opts.machine !== undefined || opts.host !== undefined)
+        ) {
+          throw new Error(
+            "--machine and --host require --root when creating a project",
+          );
+        }
+        const source =
+          opts.root === undefined
+            ? undefined
+            : buildProjectSourceFromOptions({
+                hostId: await resolveProjectSourceHostId(opts, serverUrl),
+                path: opts.root,
+              });
         const created = await sdk.projects.create({
           name: opts.name,
-          source,
+          ...(source === undefined ? {} : { source }),
         });
         if (outputJson(opts, created)) return;
         console.log(`Project created: ${created.id}`);

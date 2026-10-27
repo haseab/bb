@@ -135,7 +135,7 @@ with npm releases. Without the update shim, no freshness indicator is shown.
 Failed checks report “Latest unknown”; release checks can be retried in the UI,
 with `sdk.system.version({ force: true })`, or by rerunning `bb updates`.
 `GET /api/v1/system/version` and `sdk.system.version()` expose nullable
-`installKind` (`desktop`, `npm`, or `source`) and `currentCommit` fields.
+`installKind` (`desktop`, `npm`, or `source`) and `currentCommit` fields. The sidebar shows the release and local rebuild number on separate lines, such as `v0.47` above `#12`. `pnpm desktop:package` reserves one rebuild number for the entire packaging run, including nested frontend compilations. Explicit frontend builds also reserve a number. Dev starts, hot reloads, ordinary source edits, and app launches never increment it. The counter persists in the checkout's ignored `.bb/local-build-revision.json`; cached or already installed frontends keep their bundled number. Packaged frontends include `local-build.json`. `localBuildVersion` in the version API, SDK response, and `bb settings version --json` identifies the frontend served by that server, or is null when no compiled frontend metadata is available.
 
 - **npm installs** download the release into
   `<dataDir>/app-versions/<version>/` and restart into it. The shim runs
@@ -249,8 +249,11 @@ changed from the saved setting wins. Codex memory and native subagents live on
 the Codex provider plugin; Claude Code's options are under
 [Claude Code provider](#claude-code-provider).
 
-**Composer keys.** The prompt box uses plain-text editing; Markdown delimiters
-stay visible. Outside an open typeahead menu, Shift+Enter inserts a newline. On
+**Composer keys.** The bundled Composer plugin renders Markdown as editable
+formatting, while drafts and sent prompts remain Markdown text. Headings keep
+the composer font size. Command/Control+B toggles bold, Command/Control+I toggles
+italic, and Command/Control+E toggles inline code. Outside an open typeahead
+menu, Shift+Enter inserts a newline. On
 coarse-pointer touch devices, the software-keyboard Return inserts a newline
 and the submit button sends; iPadOS WebKit keeps the Enter and Command+Enter
 shortcuts for a connected Magic Keyboard.
@@ -383,6 +386,23 @@ unbinds a command. Overrides may be scoped to `mac`, `windows`, or `linux`. Plug
 commands bind as `plugin:<plugin-id>/<command-id>`. See
 `bb guide customization` for scoping and plugin-binding rules.
 
+New thread starts with a compact project selector. After a half-second pause,
+the project list expands with an animation and focuses search. Click the selector
+or press `Enter` / an arrow key to open it immediately. Type to
+search, use `ArrowUp` / `ArrowDown` to choose a row, and press `Enter` to select
+it and focus the message editor. `Escape` clears the project search. The last
+used project appears first; **No project** opens a personal workspace. Use
+`Shift+Tab` from the editor to reach **Change project** and press `Enter` to
+return to project search without losing the draft. The existing **New thread**
+command opens a fresh project selection step even when already composing.
+
+On macOS desktop, `app.toggle` defaults to `Command+5` globally, even while
+another app is focused. It hides bb when focused and otherwise restores its last
+focused window, including minimized windows; with all windows closed it creates
+one. Set or disable it through Settings → Keyboard, SDK keyboard settings, or
+`bb settings keyboard set app.toggle disabled --platform mac`. Quit releases
+the shortcut. If another application owns the binding, bb logs the conflict.
+
 `showKeyboardHints` (default `true`; `bb settings keyboard hints <true|false>`)
 shows delayed shortcut badges while the modifier is held; shortcuts work
 either way.
@@ -390,9 +410,25 @@ either way.
 `Mod` means Command on macOS and Control on Windows/Linux. Numbered thread and
 pane shortcuts follow Slack's browser-safe convention: web uses
 `Control+1…9` on macOS and `Ctrl+Shift+1…9` on Windows/Linux, while desktop
-uses `Mod+1…9`. The web aliases leave native browser `Mod+1…9` tab switching
+uses `Mod+1…9`, except macOS uses `Control+5` for thread 5 because `Command+5` globally shows or hides bb. The web aliases leave native browser `Mod+1…9` tab switching
 untouched. Previous and next thread use `Mod+Shift+[/]` on desktop and
 `Control+Shift+[/]` on the web; they follow the sidebar order.
+
+On macOS, `sidebar.focus` (`Command+ArrowLeft`) moves focus to the last
+selected sidebar thread, falling back to the open thread or the first thread.
+It opens a collapsed sidebar. `chat.focus` (`Command+ArrowRight`) restores the
+last focused chat control, or focuses the composer. Both are initially unbound
+on Windows/Linux and can be assigned through Keyboard settings.
+
+While a sidebar thread has focus, Up/Down moves the outlined selector through
+visible threads without opening them; Enter opens the selected thread; Enter on the already open thread starts inline rename. Section
+boundaries are traversed in displayed order and the list ends do not wrap.
+`sidebar.archiveSelected` (`Mod+Backspace`) uses the selected thread's normal
+archive action, including confirmation and Undo, and retains a neighboring
+selector afterward. It is inactive while editing, in chat, or in a terminal or
+browser. The thread-list plugin's section and reorder shortcuts use this same
+focused row. These focus and archive commands are also in the command palette;
+`bb settings keyboard set` and SDK keyboard settings can rebind them.
 
 `history.back` / `history.forward` (Go back / Go forward) do the same thing
 as the sidebar's back and forward arrows: they move through the pages opened
@@ -1084,9 +1120,44 @@ row's Customize actions, or `bb thread-list prefs get|set|reset <key>`
 | `sectionOrder`        | `["pinned","projects","threads"]` | Top-level order by project; `manualSectionOrder` and `machineSectionOrder` cover the other modes                                            |
 | `hiddenGroups`        | `[]`                              | Groups moved into More: `threads`, `project:<id>`, `section:<id>`, `machine:<hostId>` (`machine:no-machine`); `set` replaces the whole list |
 | `threadLifecycles`    | `["active"]`                      | `["active"]`, `["archived"]`, or both; empty and duplicate values are rejected                                                              |
-| `rowActions`          | `["bb--core/archive"]`            | Up to three thread action keys in display order; see below                                                                                  |
+| `rowActions`          | `["thread-list/complete"]`        | Up to three thread action keys in display order; see below                                                                                  |
 | `showProviderIcons`   | `false`                           | Shows the provider icon before each thread title                                                                                            |
 | `collapsed*`          | `[]`                              | Collapsed sections, projects, threads, environments, custom sections, and machines                                                          |
+
+Complete in a thread's menu moves it to Completed; Reopen returns it to the
+unsectioned queue. Command+Enter completes the focused sidebar thread
+(Control+Enter off macOS), rebindable as `plugin:thread-list/complete`.
+`bb thread-list complete <thread-id>` and `reopen <thread-id>` expose the same
+action, as does the plugin's `setCompleted` RPC with `{threadId, completed}`.
+`completedSectionId` (default `null`) stores the adopted or newly created
+Completed section id after first use. Completed has its own group in every
+organization. Completion unpins and detaches the selected thread but preserves
+its children, history, running agent, and environment. Archive stays separate.
+
+`chronologicalSort: "manual"` uses `manualThreadOrder` (default `[]`) to keep
+threads in a saved order across status and activity changes. Option+Up/Down
+reorders the focused sidebar thread or the open thread within its section and
+switches to Manual sorting. Command+Up/Down moves it to the previous or next
+section in the visible section order. These commands are rebindable as
+`plugin:thread-list/section-up`, `section-down`, `order-up`, and `order-down`
+(with the same prefix). Section boundaries do not wrap.
+
+`threadsSectionLabel` (default `"Threads"`) names the unsectioned bucket.
+For a manual Completed → Active → Queued pipeline, create Completed and Active
+with `bb thread section create`, set `threadsSectionLabel` to `Queued`, and put
+those two `section:<id>` entries before `threads` in `manualSectionOrder`.
+New unsectioned threads appear in Queued. Moving sections does not start, stop,
+or archive agent runs. Right-click → Move to includes
+all custom sections and the unsectioned bucket; moving a child detaches it.
+
+Set `autoActiveSectionId` (default `null`, disabled) to the Active section id to
+promote queued root threads when their runtime transitions to active. The backend
+rechecks their current state, moves only unsectioned, unpinned, unarchived threads,
+and prepends them to `manualThreadOrder`. It selects Manual sorting and turns off
+read-status grouping so the promoted thread is at the top. Already sectioned
+threads retain their placement; completion remains manual. A deleted destination
+is ignored. Use `bb thread-list prefs set autoActiveSectionId <section-id>` or the
+plugin's `setPreference` RPC to configure it.
 
 `rowActions` keys are `bb--core/<id>` (`split`, `newThreadInEnvironment`,
 `copyLink`, `read`, `pin`, `rename`, `archive`, `delete`), `thread-list/move`,
@@ -1101,6 +1172,10 @@ it is signed in to a getbb.app account. The builtin bb account plugin holds the
 server credential in its plugin KV (in `bb.db`); the builtin connect plugin
 holds the tunnel while the server runs. See the `bb-account` skill for signing
 in and the `share-server-links` skill for `bb connect` and port shares.
+
+Source development servers with `BB_DEV_APP_PORT` set route Connect traffic
+through the live Vite UI for local, staging, and production Cloud addresses.
+Packaged servers without this variable continue serving their built UI.
 
 | Connect setting          | Default | Effect                                                                                                                 |
 | ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -1277,3 +1352,26 @@ metadata is preserved. This is a desktop-local preference, with no server
 settings CLI/SDK endpoint. Builds with tolerant readers ignore the field and
 may drop it on save; older strict readers can reject the whole file, so keep a
 backup before rolling back to a build predating the tolerant-reader fix #5286.
+
+### Codex conversation synchronization
+
+Settings → Providers → Codex → **Sync Codex conversations** controls automatic
+native conversation discovery and history refresh (default on). The plugin key
+is `provider-codex.syncConversations`; use
+`bb plugin config provider-codex set syncConversations false` to turn it off.
+`bb codex-sync sync --json` refreshes conversations through the same path used by
+the background service. Existing BB project directories determine discovery.
+
+### Project folders
+
+Projects are named spaces for related threads and can exist without a filesystem folder.
+Create one by name in the app or with `bb project create --name "Research"`.
+Project settings → Folders and `bb project source add` attach optional folders;
+several folders may belong to the same machine. Removing an attachment leaves
+the folder and the project's threads intact, including when removing the last one.
+
+Agents receive the attached folders on their current machine in their instructions
+and workspace access. They follow each folder's local instructions when working
+there. Project-default threads use a managed directory when the selected machine
+has zero or multiple folders; a single folder retains the checkout/worktree default.
+Choose Project workspace explicitly to use a managed directory with any folder count.

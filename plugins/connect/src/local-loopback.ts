@@ -16,7 +16,9 @@ export function resolveLocalCloudLoopbackUrl(
     url.protocol === "http:" && url.hostname.endsWith(".localhost");
   const stagingCloud =
     url.protocol === "https:" && url.hostname.endsWith(".vibecodethis.site");
-  if (!localCloud && !stagingCloud) {
+  const productionCloud =
+    url.protocol === "https:" && url.hostname.endsWith(".getbb.app");
+  if (!localCloud && !stagingCloud && !productionCloud) {
     return null;
   }
   return `http://127.0.0.1:${port}`;

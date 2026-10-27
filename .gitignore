@@ -25,6 +25,7 @@ out
 /packages/bb-app/host-daemon/
 /packages/bb-app/host-package/
 /apps/desktop/release/
+/apps/desktop/preview-builds/
 /apps/desktop/.electron-builder.generated.json
 
 # Generated at build time by turbo `generate:*` / `build:types` tasks (see
@@ -99,3 +100,5 @@ provider-recordings/raw/
 /plugins/*/.bundled-runtime/
 
 .ci-health/
+
+.bb/local-build-revision.json*

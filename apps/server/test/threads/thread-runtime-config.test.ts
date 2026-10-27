@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   markThreadDeleted,
+  createProjectSource,
   setExperiments,
   setThreadExecutionOverride,
 } from "@bb/db";
@@ -855,6 +856,21 @@ describe("thread runtime config", () => {
       const { project } = seedProjectWithSource(harness.deps, {
         hostId: host.id,
       });
+      createProjectSource(harness.db, harness.hub, {
+        projectId: project.id,
+        hostId: host.id,
+        type: "local_path",
+        path: "/work/web",
+      });
+      const otherHost = seedHostSession(harness.deps, {
+        id: "host-other-folders",
+      }).host;
+      createProjectSource(harness.db, harness.hub, {
+        projectId: project.id,
+        hostId: otherHost.id,
+        type: "local_path",
+        path: "/other-machine/private",
+      });
       const environment = seedEnvironment(harness.deps, {
         hostId: host.id,
         projectId: project.id,
@@ -893,7 +909,10 @@ describe("thread runtime config", () => {
       }
 
       const codex = await build("codex");
+      expect(codex.instructions).toContain("/work/web");
+      expect(codex.instructions).not.toContain("/other-machine/private");
       expect(codex.options.providerOptions).toEqual({
+        additionalWorkspaceWriteRoots: ["/tmp/test-project", "/work/web"],
         memoryEnabled: true,
         providerSubagentsEnabled: true,
       });
@@ -903,6 +922,7 @@ describe("thread runtime config", () => {
 
       const claudeCode = await build("claude-code");
       expect(claudeCode.options.providerOptions).toEqual({
+        additionalWorkspaceWriteRoots: ["/tmp/test-project", "/work/web"],
         artifactsEnabled: false,
         chromeEnabled: false,
         disable1MContext: false,
@@ -914,7 +934,9 @@ describe("thread runtime config", () => {
       });
 
       const pi = await build("pi");
-      expect(pi.options.providerOptions).toEqual({});
+      expect(pi.options.providerOptions).toEqual({
+        additionalWorkspaceWriteRoots: ["/tmp/test-project", "/work/web"],
+      });
     });
   });
 
@@ -998,6 +1020,7 @@ describe("thread runtime config", () => {
       });
 
       expect(command.options.providerOptions).toEqual({
+        additionalWorkspaceWriteRoots: ["/tmp/test-project"],
         seen: {
           threadId: thread.id,
           projectId: project.id,

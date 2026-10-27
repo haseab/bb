@@ -608,7 +608,7 @@ const MARKDOWN_LOCAL_FILE_LINK_ICON = (
   <Icon
     name="ExternalLink"
     aria-hidden
-    className="ml-1 inline size-3 align-[-0.125em] text-subtle-foreground"
+    className="ml-1 inline size-3 align-[-0.125em]"
   />
 );
 
@@ -725,7 +725,7 @@ function MarkdownAnchor({
       }
       href={anchorHref}
       className={cn(
-        "break-words [overflow-wrap:anywhere] underline underline-offset-2",
+        "break-words text-file-accent [overflow-wrap:anywhere] no-underline underline-offset-2 hover:underline focus-visible:underline [&_code]:text-inherit",
       )}
       target="_blank"
       rel="noopener noreferrer"
@@ -932,7 +932,7 @@ function MarkdownCode({
 
   return (
     <code
-      className="rounded bg-muted/70 px-1.5 py-0.5 font-mono text-xs"
+      className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground"
       {...props}
     >
       {children}

@@ -276,7 +276,7 @@ export const threadEventImageGenerationItemSchema = z.object({
   parentToolCallId: z.string().optional(),
 });
 
-const threadEventUserContentSchema = z.discriminatedUnion("type", [
+export const threadEventUserContentSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("text"), text: z.string() }),
   z.object({ type: z.literal("image"), url: z.string() }),
   z.object({ type: z.literal("localImage"), path: z.string() }),
@@ -387,6 +387,7 @@ export const threadEventItemSchema = z.discriminatedUnion("type", [
       type: z.literal("userMessage"),
       id: z.string(),
       content: z.array(threadEventUserContentSchema),
+      origin: z.literal("external").optional(),
       clientRequestId: clientTurnRequestIdSchema.optional(),
       parentToolCallId: z.string().optional(),
     })

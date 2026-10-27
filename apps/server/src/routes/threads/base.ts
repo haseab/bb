@@ -1,3 +1,4 @@
+import { syncNativeSession } from "../../services/threads/native-session-sync.js";
 import { countUnarchivedThreadDescendants } from "../../services/threads/thread-archive.js";
 import { cancelAbandonedProviderCreations } from "../../services/threads/thread-environment-providers.js";
 import {
@@ -228,6 +229,16 @@ export function registerThreadBaseRoutes(app: Hono, deps: AppDeps): void {
     onValidationError: (msg) => new ApiError(400, "invalid_request", msg),
   });
   const routes = publicApiRoutes.threads;
+
+  post(routes.syncNativeSession, (context, input) => {
+    if (input.providerId !== "codex")
+      throw new ApiError(
+        400,
+        "unsupported_provider",
+        "Native session synchronization currently supports Codex",
+      );
+    return context.json(syncNativeSession(deps, input));
+  });
 
   get(routes.count, (context, query) => {
     if (query.projectId) {

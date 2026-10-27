@@ -5,6 +5,7 @@ import { resolveHostEnvironment } from "../hosts/host-environment.js";
 import {
   createProjectSource,
   getProjectSourceByHost,
+  getProjectSourceByHostPath,
   isSqliteUniqueConstraintOnColumns,
   setProjectGitRemoteUrlIfMissing,
 } from "@bb/db";
@@ -33,6 +34,15 @@ export function registerProjectSourceOnHost(
     ownsPath?: boolean;
   },
 ) {
+  if (
+    getProjectSourceByHostPath(deps.db, args.projectId, args.hostId, args.path)
+  ) {
+    throw new ApiError(
+      409,
+      "project_source_path_conflict",
+      "This folder is already attached to the project on this machine",
+    );
+  }
   let source;
   try {
     source = createProjectSource(deps.db, deps.hub, {
@@ -46,12 +56,16 @@ export function registerProjectSourceOnHost(
     if (
       error instanceof Error &&
       isSqliteUniqueConstraintOnColumns(error, {
-        columnNames: ["project_id", "host_id"],
-        indexName: "project_sources_project_host_idx",
+        columnNames: ["project_id", "host_id", "path"],
+        indexName: "project_sources_project_host_path_idx",
         tableName: "project_sources",
       })
     ) {
-      throw projectSourceHostConflict();
+      throw new ApiError(
+        409,
+        "project_source_path_conflict",
+        "This folder is already attached to the project on this machine",
+      );
     }
     throw error;
   }

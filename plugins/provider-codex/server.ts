@@ -1,3 +1,4 @@
+import { registerCodexSessionSync } from "./src/session-sync.js";
 import { registerCodexAiService } from "./src/ai-service.js";
 import { registerAsyncQuestions } from "./src/async-questions.js";
 import { registerUsageSource } from "./src/usage-source.js";
@@ -10,7 +11,14 @@ export default function plugin(bb: BbPluginApi) {
   registerCodexAiService(bb);
   registerAsyncQuestions(bb);
 
-  bb.settings.define({
+  const settings = bb.settings.define({
+    syncConversations: {
+      type: "boolean",
+      label: "Sync Codex conversations",
+      description:
+        "Automatically show and update local Codex conversations in matching bb projects.",
+      default: true,
+    },
     memoryEnabled: {
       type: "boolean",
       label: "Codex memory",
@@ -26,6 +34,11 @@ export default function plugin(bb: BbPluginApi) {
       default: false,
     },
   });
+
+  registerCodexSessionSync(
+    bb,
+    async () => (await settings.get()).syncConversations,
+  );
 
   bb.providers.register({
     id: "codex",

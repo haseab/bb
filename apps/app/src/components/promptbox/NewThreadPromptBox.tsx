@@ -343,6 +343,7 @@ const DefaultNewThreadComposer = memo(function DefaultNewThreadComposer({
         <div className="flex min-w-0 flex-1 items-center gap-1">
           {project ? (
             <ProjectSelector
+              showProjectColor
               projects={project.projects}
               value={project.value}
               onChange={project.onChange}

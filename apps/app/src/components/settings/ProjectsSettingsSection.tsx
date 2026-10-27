@@ -12,7 +12,7 @@ import {
   ResourceRowDetailChevron,
   targetsResourceAction,
 } from "@bb/shared-ui/resource-list";
-import { ProjectPathDialog } from "@/components/dialogs/ProjectPathDialog";
+import { ProjectCreateDialog } from "@/components/dialogs/ProjectCreateDialog";
 import {
   ProjectDeleteDialog,
   type ProjectDeleteDialogTarget,
@@ -41,7 +41,7 @@ import {
 } from "./sortable-settings-rows";
 
 const PROJECTS_SECTION_DESCRIPTION =
-  "Repositories bb can work in. Drag to change the order projects appear in the sidebar.";
+  "Spaces for related threads, with optional folders. Drag to change their order in the sidebar.";
 
 export function formatGitRemote(url: string): string {
   const sshMatch = /^[^@]+@([^:]+):(.+?)(?:\.git)?$/.exec(url);
@@ -109,7 +109,7 @@ function summarizeMachines(
 }
 
 function machineLabel(summary: ProjectSummary): string {
-  if (summary.configuredMachineCount === 0) return "Not set up on any machine";
+  if (summary.configuredMachineCount === 0) return "No folders attached";
   if (summary.totalMachineCount <= 1) return "1 machine";
   return `${summary.configuredMachineCount} of ${summary.totalMachineCount} machines`;
 }
@@ -176,7 +176,7 @@ function SortableProjectRow({
               <span className="min-w-0 truncate text-sm font-medium text-foreground">
                 {project.name}
               </span>
-              {needsSetup ? <SettingsBadge>needs setup</SettingsBadge> : null}
+              {needsSetup ? <SettingsBadge>No folders</SettingsBadge> : null}
               {allOffline ? <SettingsBadge>offline</SettingsBadge> : null}
             </div>
             <div className="min-w-0 space-y-0.5 text-xs text-subtle-foreground/75">
@@ -302,8 +302,8 @@ export function ProjectsSettingsSection() {
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : projects.length === 0 ? (
           <p className="text-sm text-subtle-foreground">
-            No projects yet. Add a project to start running threads in a
-            repository.
+            No projects yet. Create a space for related threads and attach
+            folders whenever you need them.
           </p>
         ) : (
           <SortableSettingsRowList
@@ -334,15 +334,11 @@ export function ProjectsSettingsSection() {
         )}
       </SettingsSection>
 
-      <ProjectPathDialog
-        target={quickCreateProject.projectPathDialog.target}
+      <ProjectCreateDialog
+        open={quickCreateProject.isOpen}
         pending={quickCreateProject.isCreating}
-        platform={quickCreateProject.platform}
-        hostId={quickCreateProject.hostId}
-        hostName={quickCreateProject.hostName}
-        hosts={quickCreateProject.hosts}
-        onOpenChange={quickCreateProject.projectPathDialog.onOpenChange}
-        onSubmit={quickCreateProject.submitProjectPath}
+        onOpenChange={quickCreateProject.onOpenChange}
+        onCreate={quickCreateProject.createProject}
       />
 
       <ProjectRenameDialog

@@ -51,6 +51,8 @@ export {
   listProjectSourcesByProjectIds,
   listProjectSourcesByHost,
   getProjectSourceByHost,
+  getProjectSourceByHostPath,
+  listProjectSourcesForHost,
   getProjectSourceOnPersistentHost,
   projectSourceOwnsPath,
   updateProjectSource,
@@ -291,6 +293,7 @@ export type {
 
 export {
   appendDaemonEventsInTransaction,
+  syncNativeTurnEvents,
   appendStoredThreadEvent,
   copyStoredThreadEventsInTransaction,
   findLastCompletedRootStoredTurn,
@@ -538,3 +541,4 @@ export type {
   DiffViewedFileRecord,
   DiffViewedFileScope,
 } from "./diff-viewed-files.js";
+export { listActiveNativeSessionThreadIds } from "./native-session-links.js";

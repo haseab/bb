@@ -1,3 +1,7 @@
+import type {
+  NativeSessionSnapshot,
+  NativeSessionSyncResult,
+} from "@bb/provider-bridge-protocol";
 import type { EnvironmentRemoval } from "@bb/domain";
 import type { MachineBootstrapApi } from "./machine-bootstrap.js";
 import type Database from "better-sqlite3";
@@ -1728,6 +1732,11 @@ export interface PluginAgents {
  * `contributeInstructions`.
  */
 export interface PluginProviders {
+  /** First-party native-session ingestion. Only provider-codex may call this path. */
+  internal_DO_NOT_USE_syncNativeSession(
+    snapshot: NativeSessionSnapshot,
+  ): Promise<NativeSessionSyncResult>;
+
   /**
    * Register an agent provider this plugin contributes (see
    * docs/api_to_audit.md before relying on it). The declaration is validated

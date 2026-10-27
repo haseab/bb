@@ -18,6 +18,10 @@ export default defineWorkspaceTestConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "virtual:bb-local-build": path.resolve(
+        __dirname,
+        "./src/test/fixtures/local-build.ts",
+      ),
     },
   },
   test: {
@@ -27,7 +31,13 @@ export default defineWorkspaceTestConfig({
     testTimeout: 15_000,
     projects: sharedWorkerProjects({
       pkgDir: __dirname,
-      aliases: { "@": path.resolve(__dirname, "./src") },
+      aliases: {
+        "@": path.resolve(__dirname, "./src"),
+        "virtual:bb-local-build": path.resolve(
+          __dirname,
+          "./src/test/fixtures/local-build.ts",
+        ),
+      },
       name: "@bb/app",
       include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
       exclude: [

@@ -239,6 +239,7 @@ describe("echo-provider canary: plugin install → server command → runtime �
     });
 
     expect(command.options.providerOptions).toEqual({
+      additionalWorkspaceWriteRoots: ["/tmp/test-project"],
       shout: true,
       model: "echo-1",
       promptMode: null,

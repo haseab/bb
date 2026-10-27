@@ -171,6 +171,7 @@ export function makeThreadListEntry(
   overrides: ThreadListEntryOverrides = {},
 ): ThreadListEntry {
   const entry: ThreadListEntry = {
+    creationSource: "bb",
     ...makeThreadWithRuntime({
       id: "thr_sender",
       environmentId: null,

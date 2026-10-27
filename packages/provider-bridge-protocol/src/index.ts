@@ -8,3 +8,9 @@ export * from "./bridge-requests.js";
 export * from "./errors.js";
 export * from "./thread-event-grammar.js";
 export * from "./thread-delta.js";
+
+export {
+  nativeSessionSnapshotSchema,
+  type NativeSessionSnapshot,
+  type NativeSessionSyncResult,
+} from "./native-session.js";

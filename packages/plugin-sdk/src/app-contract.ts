@@ -1303,6 +1303,8 @@ export interface PluginSidebarThreadActivity {
  * field. Timestamps are epoch milliseconds.
  */
 export interface PluginSidebarThread {
+  /** Where the thread was created; absent on older hosts. */
+  experimental_creationSource?: "bb" | "native";
   id: string;
   projectId: string;
   /** Null while a thread is still unnamed; pair with `titleFallback`. */

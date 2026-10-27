@@ -2,11 +2,7 @@ import { ScopedMachineEnvironmentSettings } from "@/components/settings/MachineE
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "@bb/shared-ui/icon-extended";
-import {
-  findLocalPathProjectSourceForHost,
-  type Host,
-  type LocalPathProjectSource,
-} from "@bb/domain";
+import type { Host, LocalPathProjectSource } from "@bb/domain";
 import { Button } from "@bb/shared-ui/button";
 import { Icon } from "@bb/shared-ui/icon";
 import { cn } from "@bb/shared-ui/lib/utils";
@@ -68,37 +64,35 @@ import {
   getSettingsRoutePath,
 } from "@/lib/route-paths";
 
-const CHECKOUTS_DESCRIPTION =
-  "Where this project lives on each machine. A machine needs a checkout before it can run threads for this project.";
+const FOLDERS_DESCRIPTION =
+  "Optional folders the AI can inspect and work in. Attach as many as you need on each machine; threads can also run without any folders.";
 
 const DEFAULTS_DESCRIPTION =
   "What new threads in this project start with. bb remembers the last options you used here.";
 
-interface CheckoutRowProps {
+interface ProjectFolderRowProps {
   host: Host;
   isPrimary: boolean;
   source: LocalPathProjectSource | null;
   isPathInvalid: boolean;
   canEditPath: boolean;
-  isOnlySource: boolean;
   pending: boolean;
   onSetUp: () => void;
   onChangePath: () => void;
   onRemove: () => void;
 }
 
-function CheckoutRow({
+function ProjectFolderRow({
   host,
   isPrimary,
   source,
   isPathInvalid,
   canEditPath,
-  isOnlySource,
   pending,
   onSetUp,
   onChangePath,
   onRemove,
-}: CheckoutRowProps) {
+}: ProjectFolderRowProps) {
   const connected = host.status === "connected";
   return (
     <SettingsRow className="items-start">
@@ -125,7 +119,9 @@ function CheckoutRow({
         </div>
         <div className="min-w-0 truncate font-mono text-xs text-subtle-foreground/75">
           {source === null ? (
-            <span className="font-sans italic">Not set up on this machine</span>
+            <span className="font-sans italic">
+              No folders attached on this machine
+            </span>
           ) : (
             source.path
           )}
@@ -144,7 +140,7 @@ function CheckoutRow({
           </Button>
         ) : (
           <ResourceOverflowMenu
-            label={`${host.name} checkout actions`}
+            label={`${host.name} folder actions`}
             items={[
               {
                 label: "Change folder",
@@ -152,17 +148,14 @@ function CheckoutRow({
                 disabled: !canEditPath || pending,
                 disabledReason: canEditPath
                   ? undefined
-                  : "Folders on other machines are changed from that machine.",
+                  : "Bring this machine online to change its folder.",
                 onSelect: onChangePath,
               },
               {
-                label: "Remove checkout",
+                label: "Remove folder",
                 icon: "Trash2",
                 tone: "destructive",
-                disabled: isOnlySource || pending,
-                disabledReason: isOnlySource
-                  ? "A project needs at least one checkout."
-                  : undefined,
+                disabled: pending,
                 onSelect: onRemove,
               },
             ]}
@@ -241,7 +234,11 @@ export function ProjectDetailSettingsView() {
           { onSuccess: closeDialog },
         );
       } else if (target.kind === "update") {
-        const source = sources.find((candidate) => candidate.hostId === hostId);
+        const source = sources.find(
+          (candidate) =>
+            candidate.hostId === hostId &&
+            candidate.path === target.currentPath,
+        );
         if (!source) return;
         updateLocalSource.mutate(
           { projectId, sourceId: source.id, path },
@@ -358,9 +355,6 @@ export function ProjectDetailSettingsView() {
                 <h1 className="min-w-0 truncate text-sm font-semibold text-foreground">
                   {project.name}
                 </h1>
-                {configuredCount === 0 ? (
-                  <SettingsBadge>needs setup</SettingsBadge>
-                ) : null}
               </div>
               <p className="mt-1 min-w-0 truncate text-xs text-subtle-foreground/75">
                 {remoteLabel ?? "No git remote"}
@@ -391,51 +385,74 @@ export function ProjectDetailSettingsView() {
           </div>
         </div>
 
-        <SettingsSection title="Checkouts" description={CHECKOUTS_DESCRIPTION}>
+        <SettingsSection title="Folders" description={FOLDERS_DESCRIPTION}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={
+              localSourcePending ||
+              !everyHost.some((host) => host.status === "connected")
+            }
+            onClick={() =>
+              localSourcePicker.projectPathDialog.onOpen({
+                kind: "add-source",
+                projectId: project.id,
+                projectName: project.name,
+              })
+            }
+          >
+            Add folder
+          </Button>
           {hosts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No machines are paired yet.
             </p>
           ) : (
             <SettingsRowList>
-              {hosts.map((host) => {
-                const source = findLocalPathProjectSourceForHost(
-                  sources,
-                  host.id,
+              {hosts.flatMap((host) => {
+                const hostSources = sources.filter(
+                  (source) => source.hostId === host.id,
                 );
-                const isPickerHost = host.id === pickerHostId;
-                return (
-                  <CheckoutRow
-                    key={host.id}
-                    host={host}
-                    isPrimary={hosts.length > 1 && host.id === primaryHostId}
-                    source={source ?? null}
-                    isPathInvalid={
-                      source !== undefined &&
-                      isPickerHost &&
-                      isHostPathMissing(pathExistence, source.path)
-                    }
-                    canEditPath={isPickerHost}
-                    isOnlySource={sources.length <= 1}
-                    pending={localSourcePending || deleteSource.isPending}
-                    onSetUp={() => openSetUp(host)}
-                    onChangePath={() => {
-                      if (!source) return;
-                      localSourcePicker.openPicker({
-                        kind: "update",
-                        projectId: project.id,
-                        projectName,
-                        currentPath: source.path,
-                      });
-                    }}
-                    onRemove={() => {
-                      if (!source) return;
-                      setSourceDeleteTarget({
-                        id: source.id,
-                        label: `${host.name} · ${source.path}`,
-                      });
-                    }}
-                  />
+                return (hostSources.length === 0 ? [null] : hostSources).map(
+                  (source) => {
+                    const isPickerHost = host.id === pickerHostId;
+                    return (
+                      <ProjectFolderRow
+                        key={source?.id ?? host.id}
+                        host={host}
+                        isPrimary={
+                          hosts.length > 1 && host.id === primaryHostId
+                        }
+                        source={source ?? null}
+                        isPathInvalid={
+                          source !== null &&
+                          isPickerHost &&
+                          isHostPathMissing(pathExistence, source.path)
+                        }
+                        canEditPath={host.status === "connected"}
+                        pending={localSourcePending || deleteSource.isPending}
+                        onSetUp={() => openSetUp(host)}
+                        onChangePath={() => {
+                          if (!source) return;
+                          localSourcePicker.projectPathDialog.onOpen({
+                            kind: "update",
+                            hostId: host.id,
+                            projectId: project.id,
+                            projectName,
+                            currentPath: source.path,
+                          });
+                        }}
+                        onRemove={() => {
+                          if (!source) return;
+                          setSourceDeleteTarget({
+                            id: source.id,
+                            label: `${host.name} · ${source.path}`,
+                          });
+                        }}
+                      />
+                    );
+                  },
                 );
               })}
             </SettingsRowList>
@@ -521,7 +538,7 @@ export function ProjectDetailSettingsView() {
 
         <SettingsSection
           title="Danger zone"
-          description={`Deleting ${project.name} removes the project and every thread in it, including archived ones. Checkouts stay on disk.`}
+          description={`Deleting ${project.name} removes the project and every thread in it, including archived ones. Folders stay on disk.`}
         >
           <SettingsRowList>
             <SettingsRow>
@@ -547,6 +564,7 @@ export function ProjectDetailSettingsView() {
         platform={localSourcePicker.platform}
         hostId={localSourcePicker.hostId}
         hostName={localSourcePicker.hostName}
+        hosts={hosts}
         onOpenChange={localSourcePicker.projectPathDialog.onOpenChange}
         onSubmit={localSourcePicker.submitProjectPath}
       />

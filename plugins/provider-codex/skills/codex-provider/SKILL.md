@@ -76,3 +76,27 @@ only on threads that already use them.
 
 Use the core CLI skill for command syntax and official Codex guidance for
 upstream product behavior.
+
+## Live Codex conversations
+
+With **Sync Codex conversations** enabled (default), the provider discovers local
+Codex conversations whose working directory matches an existing BB project source.
+It refreshes discovery every two seconds, follows active native turns continuously,
+and rechecks unchanged idle conversations every thirty seconds. Updates flow into
+the ordinary BB sidebar and timeline. Replies resume the original native session;
+Codex's writer lock remains authoritative. Wait for a Codex-side turn to finish
+before replying in BB. BB-owned turns are preserved, and BB-archived, deleted, or
+hidden threads are not recreated by discovery.
+
+`bb codex-sync sync --json` forces a refresh. SDK callers use
+`plugins.callRpc({ pluginId: "provider-codex", method: "sessions.sync", input: {},
+outputSchema })`; the response is `{ synced, busy, errors }`. `busy` means BB is
+currently executing that conversation and the refresh will retry.
+
+Set `bb plugin config provider-codex set syncConversations false` to disable the
+background sync. This preserves existing threads. Sync is host-local and does not
+discover cloud-only Codex conversations or create projects for unknown paths.
+
+`threads.experimental_syncNativeSession(snapshot)` exposes the core ingestion
+route to SDK callers that already have a provider-normalized snapshot. The Codex
+provider uses that same route through its first-party adapter.

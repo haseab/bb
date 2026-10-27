@@ -17,7 +17,7 @@ export default defineConfig({
     __BB_DEV_APP_BROWSER_HOST_PORT__: JSON.stringify(viteDevConfig.appPort),
   },
   server: {
-    allowedHosts: [".ts.net"],
+    allowedHosts: [".ts.net", ".getbb.app"],
     host: viteDevConfig.appHost,
     port: viteDevConfig.appPort,
     proxy: {

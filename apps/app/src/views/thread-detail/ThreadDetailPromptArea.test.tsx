@@ -645,6 +645,62 @@ describe("ThreadDetailPromptArea", () => {
     expect(onCancel).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    { status: "active", displayStatus: "active" },
+    { status: "stopping", displayStatus: "stopping" },
+  ] as const)(
+    "resubmits a sent-message edit while the thread is $status",
+    ({ status, displayStatus }) => {
+      mocks.promptDraft.text = "Untouched follow-up draft";
+      const hostElement = document.createElement("div");
+      hostElement.dataset.sentMessageEditorTestHost = "";
+      document.body.append(hostElement);
+      const onSubmit = vi.fn();
+
+      const options: RenderPromptAreaOptions = {
+        thread: makeThread({ status, runtime: { displayStatus } }),
+        sentMessageEdit: {
+          draft: { text: "Edited request", mentions: [], attachments: [] },
+          hostElement,
+          isSubmitting: false,
+          operationId: "edit-operation-running",
+          onCancel: vi.fn(),
+          onSubmit,
+          updateDraft: vi.fn(),
+        },
+      };
+      const view = renderPromptArea(options);
+      const inlineEditor = within(hostElement);
+      expect(inlineEditor.getByTestId("submit-mode").textContent).toBe(
+        "ready:",
+      );
+      fireEvent.click(
+        inlineEditor.getByRole("button", { name: "Submit composer" }),
+      );
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: [{ type: "text", text: "Edited request", mentions: [] }],
+        }),
+      );
+      expect(mocks.sendMessageMutateAsync).not.toHaveBeenCalled();
+      expect(mocks.promptDraft.clearIfCurrentMatches).not.toHaveBeenCalled();
+
+      view.rerender(
+        buildPromptAreaElement({
+          ...options,
+          pendingInteractions: [makePendingInteraction()],
+        }),
+      );
+      expect(inlineEditor.getByTestId("submit-mode").textContent).toContain(
+        "blocked:",
+      );
+      fireEvent.click(
+        inlineEditor.getByRole("button", { name: "Submit composer" }),
+      );
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("allows a staged sent-message edit while another message is queued", () => {
     mocks.defaultExecutionOptions = {
       model: "gpt-5",

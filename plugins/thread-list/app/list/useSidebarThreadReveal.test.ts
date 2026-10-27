@@ -53,6 +53,26 @@ function startReveal(
 }
 
 describe("useSidebarThreadReveal", () => {
+  it.each(["chronological", "project", "machine"] as const)(
+    "reveals a child inside Completed in %s view",
+    (organizationMode) => {
+      const root = thread("done", { sectionId: "sec_completed" });
+      const child = thread("child", {
+        sectionId: null,
+        parentThreadId: root.id,
+      });
+      const { expansion, threadIdsToExpand } = resolveThreadRevealExpansion({
+        completedSectionId: "sec_completed",
+        thread: child,
+        threadById: new Map([root, child].map((thread) => [thread.id, thread])),
+        effectivePinnedThreadIds: new Set(),
+        organizationMode,
+        personalProjectId: "proj_personal",
+      });
+      expect(expansion).toEqual({ sectionKey: "chronological::sec_completed" });
+      expect([...threadIdsToExpand]).toEqual([root.id]);
+    },
+  );
   it("requires leaving and returning before revealing the open thread again", () => {
     const { initial, reveal } = startReveal({
       threads: [thread("first"), thread("second")],
@@ -180,6 +200,7 @@ describe("useSidebarThreadReveal", () => {
 
     const { threadIdsToExpand, environmentIdsToExpand, expansion } =
       resolveThreadRevealExpansion({
+        completedSectionId: null,
         thread: child,
         threadById: new Map(threads.map((item) => [item.id, item])),
         effectivePinnedThreadIds: buildPinnedSidebarState({ threads })

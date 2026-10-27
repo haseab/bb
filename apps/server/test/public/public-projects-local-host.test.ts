@@ -72,7 +72,7 @@ describe("public project local host routes", () => {
     });
   });
 
-  it("keeps one project for every spelling of a Windows folder", async () => {
+  it("normalizes Windows folders without using them as project identity", async () => {
     await withTestHarness(async (harness) => {
       const offlinePrimary = seedHost(harness.deps, {
         id: "host-windows-project",
@@ -100,9 +100,9 @@ describe("public project local host routes", () => {
         projects.push(projectResponseSchema.parse(await readJson(response)));
       }
 
-      expect(new Set(projects.map((project) => project.id)).size).toBe(1);
+      expect(new Set(projects.map((project) => project.id)).size).toBe(3);
       expect(projects[0]?.sources[0]?.path).toBe("C:\\src\\repo");
-      expect(listPublicProjects(harness.db)).toHaveLength(1);
+      expect(listPublicProjects(harness.db)).toHaveLength(3);
     });
   });
 
@@ -161,7 +161,7 @@ describe("public project local host routes", () => {
     });
   });
 
-  it("returns the existing project when its local folder is added again", async () => {
+  it("creates independent projects that attach the same folder", async () => {
     await withTestHarness(async (harness) => {
       const offlinePrimary = seedHost(harness.deps, {
         id: "host-duplicate-project",
@@ -199,8 +199,8 @@ describe("public project local host routes", () => {
       const repeatedProject = projectResponseSchema.parse(
         await readJson(repeatedResponse),
       );
-      expect(repeatedProject.id).toBe(firstProject.id);
-      expect(listPublicProjects(harness.db)).toHaveLength(1);
+      expect(repeatedProject.id).not.toBe(firstProject.id);
+      expect(listPublicProjects(harness.db)).toHaveLength(2);
     });
   });
 

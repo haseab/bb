@@ -504,9 +504,10 @@ export const projectSources = sqliteTable(
   (table) => [
     index("project_sources_project_idx").on(table.projectId),
     index("project_sources_host_idx").on(table.hostId),
-    uniqueIndex("project_sources_project_host_idx").on(
+    uniqueIndex("project_sources_project_host_path_idx").on(
       table.projectId,
       table.hostId,
+      table.path,
     ),
     check(
       "project_sources_shape_check",
@@ -603,6 +604,9 @@ export const threads = sqliteTable(
       onDelete: "set null",
     }),
     providerId: text("provider_id").notNull(),
+    creationSource: text("creation_source", { enum: ["bb", "native"] })
+      .notNull()
+      .default("bb"),
     modelOverride: text("model_override"),
     reasoningLevelOverride: text(
       "reasoning_level_override",
@@ -1366,4 +1370,38 @@ export const projectAttachmentBackfills = sqliteTable(
     attemptedAt: integer("attempted_at").notNull(),
     error: text("error"),
   },
+);
+
+export const nativeSessionLinks = sqliteTable(
+  "native_session_links",
+  {
+    hostId: text("host_id")
+      .notNull()
+      .references(() => hosts.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull(),
+    providerThreadId: text("provider_thread_id").notNull(),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => threads.id, { onDelete: "cascade" }),
+    active: integer("active", { mode: "boolean" }).notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.hostId, table.providerId, table.providerThreadId],
+    }),
+    uniqueIndex("native_session_links_thread_idx").on(table.threadId),
+  ],
+);
+
+export const nativeSessionTurns = sqliteTable(
+  "native_session_turns",
+  {
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => threads.id, { onDelete: "cascade" }),
+    providerTurnId: text("provider_turn_id").notNull(),
+    hash: text("hash").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.threadId, table.providerTurnId] })],
 );

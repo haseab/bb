@@ -1,3 +1,7 @@
+import type {
+  NativeSessionSnapshot,
+  NativeSessionSyncResult,
+} from "@bb/provider-bridge-protocol";
 import {
   type PromptInput,
   type PendingInteraction,
@@ -598,6 +602,11 @@ export interface ThreadQueueArea {
 }
 
 export interface ThreadsArea {
+  /** Experimental native-session snapshot ingestion; see docs/api_to_audit.md. */
+  experimental_syncNativeSession(
+    args: NativeSessionSnapshot & { signal?: AbortSignal },
+  ): Promise<NativeSessionSyncResult>;
+
   archive(args: ThreadActionArgs): Promise<ThreadArchiveResult>;
   archiveAll(args: ThreadActionArgs): Promise<ThreadArchiveAllResult>;
   childSummary(args: ThreadStatusArgs): Promise<ThreadChildSummaryResult>;
@@ -1311,6 +1320,15 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
             },
           },
           ...signalRequestArgs(input.signal),
+        ),
+      );
+    },
+    async experimental_syncNativeSession(input) {
+      const { signal, ...snapshot } = input;
+      return transport.readJson(
+        transport.api.v1.threads["native-session"].$post(
+          { json: snapshot },
+          ...signalRequestArgs(signal),
         ),
       );
     },

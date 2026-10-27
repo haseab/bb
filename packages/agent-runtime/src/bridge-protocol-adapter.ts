@@ -124,9 +124,22 @@ function toBridgeWireOptions(
     approvalReviewer,
     permissionEscalation,
   } = options;
+  const rootsSchema = z.array(z.string());
+  const staticRoots = rootsSchema.parse(
+    staticProviderOptions?.additionalWorkspaceWriteRoots ?? [],
+  );
+  const threadRoots = rootsSchema.parse(
+    options.providerOptions?.additionalWorkspaceWriteRoots ?? [],
+  );
+  const additionalWorkspaceWriteRoots = [
+    ...new Set([...staticRoots, ...threadRoots]),
+  ];
   const providerOptions = {
     ...staticProviderOptions,
     ...options.providerOptions,
+    ...(additionalWorkspaceWriteRoots.length > 0
+      ? { additionalWorkspaceWriteRoots }
+      : {}),
   };
   return {
     ...(model !== undefined ? { model } : {}),

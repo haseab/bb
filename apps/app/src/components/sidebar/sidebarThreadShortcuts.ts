@@ -10,6 +10,7 @@ const MAX_SIDEBAR_THREAD_SHORTCUTS = 9;
 
 export interface SidebarThreadShortcutTarget {
   element: HTMLAnchorElement | null;
+  placeholder?: HTMLElement;
   key: string;
   threadId: string;
   projectId: string | null;
@@ -71,6 +72,7 @@ function collectSidebarThreadTargets(
         }
         targets.push({
           element: null,
+          placeholder: element,
           key: String(targets.length + 1),
           threadId: pair.slice(0, separator),
           projectId: pair.slice(separator + 1),

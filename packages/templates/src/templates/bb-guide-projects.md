@@ -7,7 +7,9 @@ editingNotes: Keep flags accurate against the CLI implementation.
 ---
 Project commands
 
-A project maps to a code repository. All threads belong to a project.
+A project is a named space for related threads, independent of any folder.
+It can have zero or more attached machine-local folders. All threads belong to
+a project. Multiple projects may attach the same folder without sharing identity.
 
   bb project list                         List ordinary projects
     --include-personal                    Also include the personal project
@@ -19,13 +21,14 @@ A project maps to a code repository. All threads belong to a project.
     --after <id>                          Previous project, or omit for start
     --before <id>                         Next project, or omit for end
   bb project create --name "..." [options]
-    --root <path>                         Project source path
+    --root <path>                         Optional initial folder
     --machine <id-or-name>                Bind the path to a connected machine
     --host <id-or-name>                   Alias for --machine
 
   An explicit machine/host selector accepts an exact ID or unambiguous name and
   binds --root to that machine. Omitting the selector preserves the existing
-  local CLI machine fallback (normally the server machine).
+  local CLI machine fallback (normally the server machine). Without --root,
+  project creation needs only a name and does not contact a machine.
 
   bb project show <id>                    Show project details
     Accepts proj_personal to inspect Personal.
@@ -89,7 +92,8 @@ Attachments:
 
 Sources:
 
-  Projects can have multiple machine-local path sources.
+  Projects can have multiple machine-local folders, including several on the
+  same machine. The source commands manage those folder attachments.
 
   bb project source add <projectId>       Add a source
     --path <path>                         Local path
@@ -108,5 +112,17 @@ Sources:
 
   bb project source delete <projectId> <sourceId>
 
-  A live project must retain at least one source; a project pending deletion
-  may remove its last source.
+  Removing a source detaches the folder; it does not delete files or threads.
+  A project may remove every source and continue to run threads. The AI receives
+  the project folder list on its current machine as context and workspace access.
+  Folders on other machines are not included in that session.
+
+  Project-default threads use a managed project workspace when the selected
+  machine has zero or multiple folders. A single attached folder retains the
+  checkout/worktree default. An explicit environment selection overrides this.
+  To select the managed directory explicitly:
+
+    bb thread spawn --project <id> --environment-provider project-workspace --prompt "..."
+
+  SDK: projects.create({ name: "Research" }) creates a folderless project.
+  projects.sources.add/update/delete manage the same folder attachments as the CLI.

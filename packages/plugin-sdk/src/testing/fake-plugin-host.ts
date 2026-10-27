@@ -1485,6 +1485,11 @@ function createFakePluginHostInternal(
   };
 
   const providers: PluginProviders = {
+    async internal_DO_NOT_USE_syncNativeSession() {
+      throw new Error(
+        "Native session sync requires the server integration harness",
+      );
+    },
     register(declaration) {
       return registerProviderDeclaration(declaration);
     },

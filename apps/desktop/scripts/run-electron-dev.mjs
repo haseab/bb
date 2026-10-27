@@ -21,7 +21,7 @@ function resolveDesktopUserDataDir(env, dataDir) {
   return resolve(rawUserDataDir);
 }
 
-const VITE_PROBE_TIMEOUT_MS = 800;
+const VITE_PROBE_TIMEOUT_MS = 5_000;
 
 function createElectronAppEnv(env, config) {
   const childEnv = toDevProcessEnv({
@@ -56,7 +56,7 @@ const childEnv = createElectronAppEnv(process.env, devConfig);
 const dataDir = devConfig.dataDir;
 const desktopUserDataDir = resolveDesktopUserDataDir(childEnv, dataDir);
 
-const appUrl = `http://localhost:${devConfig.ports.appPort}`;
+const appUrl = `http://127.0.0.1:${devConfig.ports.appPort}`;
 const viteReachable = await isViteDevServerReachable(appUrl);
 if (viteReachable) {
   childEnv.BB_DESKTOP_APP_URL = appUrl;

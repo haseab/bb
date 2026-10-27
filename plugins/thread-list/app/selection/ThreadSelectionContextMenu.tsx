@@ -24,7 +24,11 @@ import { Icon } from "@/components/ui/icon";
 import type { SidebarThread } from "../model/sidebar-thread.js";
 import { useSidebarData } from "../model/use-sidebar-data.js";
 import { useMoveDestinations } from "../rows/moveThreadAction.js";
+import { useThreadCompletion } from "../rows/completeThreadAction.js";
 import { useThreadSelectionStore } from "./threadSelection.js";
+
+import { moveThreadToSection } from "../rows/moveThreadToSection.js";
+import { captureThreadPipelinePositions } from "../pipeline/threadPipelineAnimation.js";
 
 const SURFACE = "context";
 
@@ -52,6 +56,7 @@ function ThreadSelectionMenuItems({
   threadIds: readonly string[];
 }) {
   const sdk = useSdk();
+  const completion = useThreadCompletion();
   const store = useThreadSelectionStore();
   const { projects } = useSidebarData();
   const destinations = useMoveDestinations();
@@ -109,22 +114,14 @@ function ThreadSelectionMenuItems({
       )
       .catch(() => toast.error("Failed to pin threads."));
   };
-  const moveToSection = (sectionId: string | null) =>
+  const moveToSection = (sectionId: string | null) => {
+    captureThreadPipelinePositions();
     void settleAll(
-      roots.map(async (thread) => {
-        if (thread.pinnedAt !== null) {
-          await sdk.threads.unpin({ threadId: thread.id });
-        }
-        if (thread.sectionId !== sectionId || thread.parentThreadId !== null) {
-          await sdk.threads.update({
-            threadId: thread.id,
-            sectionId,
-            ...(thread.parentThreadId === null ? {} : { parentThreadId: null }),
-          });
-        }
-      }),
+      roots.map((thread) => moveThreadToSection(sdk, thread, sectionId)),
+
       "Failed to move threads.",
     );
+  };
   const archive = async () => {
     const results = await Promise.allSettled(
       active.map((thread) => sdk.threads.archive({ threadId: thread.id })),
@@ -175,7 +172,7 @@ function ThreadSelectionMenuItems({
         <ContextMenuSub>
           <ContextMenuSubTrigger>
             <Icon name="SectionMove" aria-hidden="true" />
-            Move to section
+            Move to
           </ContextMenuSubTrigger>
           <ContextMenuSubContent>
             {destinations.map((destination) => (
@@ -195,6 +192,21 @@ function ThreadSelectionMenuItems({
       <ActionMenuItem surface={SURFACE} icon="X" onSelect={() => store.clear()}>
         Clear selection
       </ActionMenuItem>
+      {active.length > 0 ? (
+        <ActionMenuItem
+          surface={SURFACE}
+          icon="Check"
+          disabled={!completion.ready}
+          onSelect={() =>
+            void settleAll(
+              active.map((thread) => completion.setCompleted(thread.id, true)),
+              "Failed to complete some threads.",
+            )
+          }
+        >
+          Complete {describeThreads(active.length)}
+        </ActionMenuItem>
+      ) : null}
       {active.length > 0 ? (
         <ActionMenuItem
           surface={SURFACE}

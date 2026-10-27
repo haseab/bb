@@ -470,9 +470,25 @@ describe("app keybindings", () => {
             shift: false,
             when: {
               all: ["mainSurface"],
-              none: ["modalOpen"],
+              none: index === 4 ? ["modalOpen", "macPlatform"] : ["modalOpen"],
             },
           },
+          ...(index === 4
+            ? [
+                {
+                  command,
+                  desktopOnly: true,
+                  key: "5",
+                  mod: false,
+                  control: true,
+                  shift: false,
+                  when: {
+                    all: [...["mainSurface"], "macPlatform"],
+                    none: ["modalOpen"],
+                  },
+                },
+              ]
+            : []),
         ]),
       );
       expect(
@@ -639,9 +655,25 @@ describe("app keybindings", () => {
             shift: false,
             when: {
               all: ["mainSurface", "splitActive"],
-              none: ["modalOpen"],
+              none: index === 4 ? ["modalOpen", "macPlatform"] : ["modalOpen"],
             },
           },
+          ...(index === 4
+            ? [
+                {
+                  command,
+                  desktopOnly: true,
+                  key: "5",
+                  mod: false,
+                  control: true,
+                  shift: false,
+                  when: {
+                    all: [...["mainSurface", "splitActive"], "macPlatform"],
+                    none: ["modalOpen"],
+                  },
+                },
+              ]
+            : []),
         ]),
         {
           command: "pane.maximize.toggle",
@@ -670,14 +702,19 @@ describe("app keybindings", () => {
         "thread.new",
         "thread.previous",
         "thread.next",
-        ...THREAD_JUMP_APP_COMMAND_IDS,
-        ...PANE_FOCUS_APP_COMMAND_IDS,
+        ...THREAD_JUMP_APP_COMMAND_IDS.flatMap((command, index) =>
+          index === 4 ? [command, command] : [command],
+        ),
+        ...PANE_FOCUS_APP_COMMAND_IDS.flatMap((command, index) =>
+          index === 4 ? [command, command] : [command],
+        ),
         "panel.reopenClosedTab",
         "browser.focusLocation",
         "browser.reload",
         "browser.find",
         "window.find",
         "window.new",
+        "app.toggle",
       ]);
     });
   });

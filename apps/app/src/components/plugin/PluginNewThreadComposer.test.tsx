@@ -1227,6 +1227,69 @@ describe("PluginNewThreadComposer seeding", () => {
     expect(latestPromptBoxProps().project.value).toBe("proj_1");
   });
 
+  it.each([0, 2])(
+    "submits a project with %i attached folders through a managed project workspace",
+    async (folderCount) => {
+      const submitted: NewThreadRequest[] = [];
+      mocks.extraProjects = [
+        {
+          ...PROJECT,
+          id: "proj_space",
+          name: "Project space",
+          sources: Array.from({ length: folderCount }, (_, index) => ({
+            ...PROJECT.sources[0],
+            id: `src_space_${index}`,
+            projectId: "proj_space",
+            path: `/workspace/folder-${index}`,
+          })),
+        },
+      ];
+      mocks.environmentProviders = [
+        CHECKOUT_PROVIDER,
+        {
+          ...PERSONAL_WORKSPACE_PROVIDER,
+          id: "project-workspace",
+          displayName: "Project workspace",
+          requires: {
+            ...PERSONAL_WORKSPACE_PROVIDER.requires,
+            projectless: false,
+          },
+        },
+      ];
+      render(
+        <MemoryRouter>
+          <PluginNewThreadComposer
+            draftKey={`project-space-${folderCount}`}
+            defaultProjectId="proj_space"
+            defaultProviderId="claude-code"
+            defaultModel="gpt-5.6-sol"
+            initialPrompt="Inspect the attached folders"
+            onSubmit={(request) => {
+              submitted.push(request);
+            }}
+          />
+        </MemoryRouter>,
+      );
+      await waitFor(() => {
+        expect(latestPromptBoxProps().disabled).toBe(false);
+        expect(latestPromptBoxProps().modeConfig.environment.value).toBe(
+          "provider:project-workspace",
+        );
+      });
+      await submit();
+      expect(submitted).toHaveLength(1);
+      expect(submitted[0]).toMatchObject({
+        projectId: "proj_space",
+        environment: {
+          type: "provider",
+          environmentProviderId: "project-workspace",
+          machine: { type: "existing", hostId: "host_1" },
+          inputs: null,
+        },
+      });
+    },
+  );
+
   it("allows submitting a projectless thread", async () => {
     const submitted: NewThreadRequest[] = [];
     renderComposer(

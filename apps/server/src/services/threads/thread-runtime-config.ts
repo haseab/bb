@@ -2,7 +2,12 @@ import {
   resolveHostEnvironment,
   mergeHostAndProviderEnvironment,
 } from "../hosts/host-environment.js";
-import { getEnvironment, getHost, getProject } from "@bb/db";
+import {
+  getEnvironment,
+  getHost,
+  getProject,
+  listProjectSourcesForHost,
+} from "@bb/db";
 import type {
   DynamicTool,
   InstructionMode,
@@ -67,6 +72,7 @@ export interface ResolvedThreadRuntimeCommandConfig {
   instructionMode: InstructionMode;
   instructions: string;
   projectId: string;
+  projectFolderPaths: string[];
   providerId: string;
   threadStoragePath: string;
   workspacePath: string;
@@ -219,6 +225,29 @@ export async function resolveThreadRuntimeCommandConfig(
     (contribution) => contribution.tool,
   );
   const instructionSections: string[] = [];
+  const projectFolders = listProjectSourcesForHost(
+    deps.db,
+    project.id,
+    host.id,
+  );
+  const projectFolderPaths = [
+    ...new Set(
+      projectFolders.map((source, index) =>
+        index === 0 && environment.environmentProviderId === "git-worktree"
+          ? workspacePath
+          : source.path,
+      ),
+    ),
+  ];
+  instructionSections.push(
+    `This thread belongs to the BB project ${JSON.stringify(project.name)}. A project is a space for related threads and can have multiple attached folders.`,
+  );
+  if (projectFolderPaths.length > 0) {
+    instructionSections.push(
+      "The following folders are attached to this project on the current machine. Inspect the folders relevant to the task and follow their local AGENTS.md instructions when working in them:",
+      ...projectFolderPaths.map((path) => `- ${JSON.stringify(path)}`),
+    );
+  }
   for (const contribution of dynamicToolContributions) {
     if (!contribution.instructions) continue;
     if (contribution.pluginId === null) {
@@ -288,6 +317,7 @@ export async function resolveThreadRuntimeCommandConfig(
     instructionMode: "append",
     instructions,
     projectId: args.thread.projectId,
+    projectFolderPaths,
     providerId: args.thread.providerId,
     threadStoragePath,
     workspacePath,

@@ -31,25 +31,31 @@ const preferenceKeySchema = z.enum(
 const preferenceValuesSchema = z.object(
   Object.fromEntries(
     PREFERENCE_KEYS.map((key) => [key, preferenceDefinitions[key].schema]),
-  ) as { [Key in PreferenceKey]: (typeof preferenceDefinitions)[Key]["schema"] },
+  ) as {
+    [Key in PreferenceKey]: (typeof preferenceDefinitions)[Key]["schema"];
+  },
 );
 
 export const threadListRpcContract = defineRpcContract({
+  setCompleted: {
+    input: z
+      .object({ threadId: z.string().min(1), completed: z.boolean() })
+      .strict(),
+    output: z
+      .object({ threadId: z.string(), sectionId: z.string().nullable() })
+      .strict(),
+  },
   listPreferences: {
     input: z.null(),
     output: z.object({ preferences: preferenceValuesSchema }).strict(),
   },
   setPreference: {
     input: z.object({ key: preferenceKeySchema, value: z.unknown() }).strict(),
-    output: z
-      .object({ key: preferenceKeySchema, value: z.unknown() })
-      .strict(),
+    output: z.object({ key: preferenceKeySchema, value: z.unknown() }).strict(),
   },
   resetPreference: {
     input: z.object({ key: preferenceKeySchema }).strict(),
-    output: z
-      .object({ key: preferenceKeySchema, value: z.unknown() })
-      .strict(),
+    output: z.object({ key: preferenceKeySchema, value: z.unknown() }).strict(),
   },
 });
 
@@ -149,7 +155,9 @@ export async function migrateFromUiPreferences(
     if (legacy === undefined) continue;
     const parsed = parsePreferenceValue(key, legacy.value);
     if (!parsed.success) continue;
-    if (JSON.stringify(parsed.value) === JSON.stringify(getPreferenceDefault(key))) {
+    if (
+      JSON.stringify(parsed.value) === JSON.stringify(getPreferenceDefault(key))
+    ) {
       continue;
     }
     await bb.storage.kv.set(kvKey(key), parsed.value);
@@ -183,7 +191,118 @@ const JSON_OPTION = {
 export default async function threadListPlugin(bb: BbPluginApi) {
   const store = createPreferenceStore(bb);
 
+  let sectionTransition = Promise.resolve();
+  function setCompleted(threadId: string, completed: boolean) {
+    const operation = sectionTransition.then(async () => {
+      const thread = await bb.sdk.threads.get({ threadId });
+      if (thread.archivedAt !== null || thread.deletedAt !== null)
+        throw new Error("Unarchive the thread before changing completion.");
+      const sections = await bb.sdk.threadSections.list();
+      const savedId = await store.read("completedSectionId");
+      let section = sections.find((candidate) => candidate.id === savedId);
+      if (!completed) {
+        if (!section || thread.sectionId !== section.id)
+          return { threadId, sectionId: thread.sectionId };
+        await bb.sdk.threads.update({ threadId, sectionId: null });
+        return { threadId, sectionId: null };
+      }
+      section ??= sections.find(
+        (candidate) => candidate.name.toLowerCase() === "completed",
+      );
+      section ??= await bb.sdk.threadSections.create({ name: "Completed" });
+      if (savedId !== section.id)
+        await store.write("completedSectionId", section.id);
+      if (thread.pinnedAt !== null) await bb.sdk.threads.unpin({ threadId });
+      if (thread.sectionId !== section.id || thread.parentThreadId !== null)
+        await bb.sdk.threads.update({
+          threadId,
+          sectionId: section.id,
+          parentThreadId: null,
+        });
+      return { threadId, sectionId: section.id };
+    });
+    sectionTransition = operation.then(
+      () => {},
+      () => {},
+    );
+    return operation;
+  }
+
+  bb.events.on("thread.active", ({ thread: eventThread }) => {
+    sectionTransition = sectionTransition
+      .then(async () => {
+        const preferences = await store.readAll();
+        const sectionId = preferences.autoActiveSectionId;
+        if (sectionId === null) return;
+        const thread = await bb.sdk.threads.get({ threadId: eventThread.id });
+        if (
+          thread.status !== "active" ||
+          thread.sectionId !== null ||
+          thread.parentThreadId !== null ||
+          thread.pinnedAt !== null ||
+          thread.archivedAt !== null ||
+          thread.deletedAt !== null
+        )
+          return;
+        const sections = await bb.sdk.threadSections.list();
+        if (!sections.some((section) => section.id === sectionId)) return;
+        await bb.sdk.threads.update({ threadId: thread.id, sectionId });
+        const currentOrder = await store.read("manualThreadOrder");
+        await store.write("manualThreadOrder", [
+          thread.id,
+          ...currentOrder.filter((id) => id !== thread.id),
+        ]);
+        if (preferences.chronologicalSort !== "manual")
+          await store.write("chronologicalSort", "manual");
+        if (preferences.groupByReadStatus)
+          await store.write("groupByReadStatus", false);
+      })
+      .catch((error: unknown) => {
+        bb.log.warn(
+          `could not move a running queued thread to Active: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    return sectionTransition;
+  });
+
+  bb.events.on("thread.idle", ({ thread: eventThread }) => {
+    sectionTransition = sectionTransition
+      .then(async () => {
+        const sectionId = await store.read("autoActiveSectionId");
+        if (sectionId === null) return;
+        const thread = await bb.sdk.threads.get({ threadId: eventThread.id });
+        if (
+          thread.status !== "idle" ||
+          thread.sectionId !== sectionId ||
+          thread.parentThreadId !== null ||
+          thread.pinnedAt !== null ||
+          thread.archivedAt !== null ||
+          thread.deletedAt !== null
+        )
+          return;
+        await bb.sdk.threads.update({ threadId: thread.id, sectionId: null });
+        const preferences = await store.readAll();
+        await store.write("manualThreadOrder", [
+          thread.id,
+          ...preferences.manualThreadOrder.filter((id) => id !== thread.id),
+        ]);
+        if (preferences.chronologicalSort !== "manual")
+          await store.write("chronologicalSort", "manual");
+        if (preferences.groupByReadStatus)
+          await store.write("groupByReadStatus", false);
+      })
+      .catch((error: unknown) => {
+        bb.log.warn(
+          `could not return a finished Active thread to Queued: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    return sectionTransition;
+  });
+
   bb.rpc.register(threadListRpcContract, {
+    async setCompleted({ threadId, completed }) {
+      return setCompleted(threadId, completed);
+    },
     async listPreferences() {
       return { preferences: await store.readAll() };
     },
@@ -198,10 +317,50 @@ export default async function threadListPlugin(bb: BbPluginApi) {
   bb.cli.register(
     defineCli({
       name: bb.pluginId,
-      summary: "Inspect and change the sidebar thread list's layout preferences",
+      summary:
+        "Inspect and change the sidebar thread list's layout preferences",
       description:
         "Organization mode, sort, section order, hidden groups, and collapsed groups for bb's sidebar thread list. Values are JSON; a bare word is read as a string.",
       commands: {
+        complete: cliCommand({
+          summary:
+            "Complete a thread and move it to Completed without archiving",
+          positionals: [
+            { name: "thread-id", description: "Thread id", required: true },
+          ],
+          options: { json: JSON_OPTION },
+          async run(input) {
+            const result = await setCompleted(
+              input.positionals["thread-id"],
+              true,
+            );
+            return {
+              exitCode: 0,
+              stdout: input.options.json
+                ? JSON.stringify(result)
+                : `Completed ${result.threadId}`,
+            };
+          },
+        }),
+        reopen: cliCommand({
+          summary: "Return a completed thread to the unsectioned queue",
+          positionals: [
+            { name: "thread-id", description: "Thread id", required: true },
+          ],
+          options: { json: JSON_OPTION },
+          async run(input) {
+            const result = await setCompleted(
+              input.positionals["thread-id"],
+              false,
+            );
+            return {
+              exitCode: 0,
+              stdout: input.options.json
+                ? JSON.stringify(result)
+                : `Reopened ${result.threadId}`,
+            };
+          },
+        }),
         "prefs list": cliCommand({
           summary: "List every preference and its current value",
           options: { json: JSON_OPTION },
@@ -242,7 +401,8 @@ export default async function threadListPlugin(bb: BbPluginApi) {
             { name: "key", description: "Preference name", required: true },
             {
               name: "value",
-              description: 'JSON value, e.g. \'"machine"\' or \'["pinned","threads"]\'',
+              description:
+                'JSON value, e.g. \'"machine"\' or \'["pinned","threads"]\'',
               required: true,
             },
           ],

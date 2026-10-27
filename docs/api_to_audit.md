@@ -2465,6 +2465,8 @@ Docs: `frontend-renderer-slots.md`, `testing.md`.
 paged/windowed read at 10k threads) and 5 (the draft indicator gap) cannot be
 resolved without one, and both change the contract.
 
+The optional `PluginSidebarThread.experimental_creationSource` reports `bb` or `native` from persisted thread provenance. The thread-list plugin uses it for origin tooltips and Codex icon tint. Stabilization requires import, continuation, and older-host coverage.
+
 The read hook returns the sidebar's live thread view (`PluginSidebarThread`
 DTOs with a host-resolved `indicator`, plus `sections`) from the host's own
 query and cache. The action hook is `@internal` and scheduled for removal
@@ -3643,3 +3645,28 @@ Docs: `providers.md`.
 
 Before stabilization, decide whether `model/list` `supportedServiceTiers` may
 override the icon and whether reasoning levels should render it.
+
+## First-party native Codex conversation synchronization
+
+`bb.providers.internal_DO_NOT_USE_syncNativeSession(snapshot)` is reserved for
+`provider-codex`. It links host/provider/native-thread IDs to BB threads in existing
+projects, materializes provider deltas through core's assembler, and refreshes
+native-owned timeline snapshots. It cannot replace turns originally recorded by
+BB, resurrect hidden/archived/deleted threads, or write during BB execution.
+`plugins/provider-codex/src/session-sync.ts` is its only caller. Automatic refresh,
+the `sessions.sync` plugin RPC (available through `sdk.plugins.callRpc`), and
+`bb codex-sync sync` all use this same ingestion path.
+
+`experimental_nativeSessionSnapshotSchema`, `ExperimentalNativeSessionSnapshot`
+and `ExperimentalNativeSessionSyncResult` are the typed provider-bridge transport
+for the first-party history reader. Before making this a general provider API,
+audit provider ownership, external history rewrites, remote host reconnection,
+archiving/deletion policy, and attachment retention. Keep ingestion internal until
+multiple providers need it.
+
+`threads.experimental_syncNativeSession(snapshot)` is the SDK ingestion surface
+backed by `POST /threads/native-session`. Core's first-party plugin adapter calls
+this same route so database operations execute through the server's normal request boundary,
+while plugins pass plain snapshots. The core route is also
+available to SDK clients. Before stabilization, audit provider-specific validation,
+external user-message origins, host/project mapping and concurrent writers.

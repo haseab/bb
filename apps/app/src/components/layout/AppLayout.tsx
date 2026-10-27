@@ -60,7 +60,7 @@ import {
   COMPACT_SHELF_HIDDEN_FIXED_CHROME_CLASS,
   usePanelShelfState,
 } from "@/components/ui/secondary-panel-shelf-visibility";
-import { ProjectPathDialog } from "@/components/dialogs/ProjectPathDialog";
+import { ProjectCreateDialog } from "@/components/dialogs/ProjectCreateDialog";
 import { ProjectActionsMenu } from "@/components/project/ProjectActionsMenu";
 import { ProjectActionsProvider } from "@/components/project/ProjectActionsProvider";
 import {
@@ -537,7 +537,7 @@ function AppLayoutContent({ children }: AppLayoutProps) {
       setRootComposeProjectId(projectId);
     }
     void navigate(getRootComposeRoutePath(), {
-      state: { focusPrompt: true },
+      state: { focusPrompt: true, chooseProject: true },
     });
     return true;
   });
@@ -870,15 +870,11 @@ function AppLayoutContent({ children }: AppLayoutProps) {
                 projectId={projectId ?? null}
               />
               <NotificationCenter />
-              <ProjectPathDialog
-                target={quickCreateProject.projectPathDialog.target}
+              <ProjectCreateDialog
+                open={quickCreateProject.isOpen}
                 pending={quickCreateProject.isCreating}
-                platform={quickCreateProject.platform}
-                hostId={quickCreateProject.hostId}
-                hostName={quickCreateProject.hostName}
-                hosts={quickCreateProject.hosts}
-                onOpenChange={quickCreateProject.projectPathDialog.onOpenChange}
-                onSubmit={quickCreateProject.submitProjectPath}
+                onOpenChange={quickCreateProject.onOpenChange}
+                onCreate={quickCreateProject.createProject}
               />
             </ThreadActionsProvider>
           </ThreadTitleMentionResourcesProvider>

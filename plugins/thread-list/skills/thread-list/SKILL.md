@@ -5,6 +5,33 @@ description: "Inspect or change the sidebar thread list's layout preferences: or
 
 # Thread list preferences
 
+## Complete and reopen threads
+
+Choose Complete from a thread's three-dot menu, or press Command+Enter
+(Control+Enter on other platforms) while the sidebar selector is on that thread.
+The command is `plugin:thread-list/complete` and can be rebound in Settings →
+Keyboard. It only acts on the focused sidebar row, leaving composer submission
+unchanged. Completed rows offer Reopen to return to the unsectioned queue.
+The default row quick action is Complete; Archive remains a separate menu action.
+
+```sh
+bb thread-list complete <thread-id> [--json]
+bb thread-list reopen <thread-id> [--json]
+```
+
+The first completion adopts an existing Completed section or creates one, saving
+its id in `completedSectionId` (default `null`). Completed is shown separately
+in every organization mode. Completion uses core section placement: it unpins
+and detaches the selected thread, keeping its children beneath it. It does not
+stop a run, archive its environment, or remove its history. Moving a thread out
+of this section also reopens it. Archived threads must be unarchived first.
+Existing archived threads are left archived.
+
+SDK clients use `bb.sdk.plugins.callRpc` with plugin id `thread-list`, method
+`setCompleted`, and input `{ threadId, completed: true }` (or `false` to reopen).
+The typed `threadListRpcContract` exposes the same operation used by menus,
+keyboard, and CLI. It returns `{ threadId, sectionId }`.
+
 The Thread list plugin owns the sidebar's layout state. Read it with
 `bb thread-list prefs list --json`; keys are `showProviderIcons`, `threadLifecycles`, `organizationMode`,
 `environmentGrouping`, `groupByReadStatus`, `chronologicalSort`, `sortDirection`, `sectionOrder`,
@@ -61,9 +88,9 @@ of the list. The same preference is available through `setPreference` RPC.
 hover, left to right before its actions menu, as thread action keys: bb's
 `bb--core/split`, `bb--core/copyLink`, `bb--core/read`, `bb--core/pin`,
 `bb--core/rename`, `bb--core/archive`, `bb--core/delete`, the list's
-`thread-list/move` (opens a section menu), or another plugin's
+`thread-list/move` (opens a section menu), `thread-list/complete`, or another plugin's
 `<pluginId>/<actionId>`. Bare legacy ids such as `archive` and `core/<id>`
-keys still work. The default is `'["bb--core/archive"]'` and `'[]'` leaves
+keys still work. The default is `'["thread-list/complete"]'` and `'[]'` leaves
 only the menu. For example,
 `bb thread-list prefs set rowActions '["bb--core/pin","bb--core/archive"]'`.
 In the app, a thread
@@ -71,6 +98,11 @@ row's actions menu has Customize actions, which turns that row's quick
 actions into three editable slots in place; each slot picks an action, a filled
 slot can Hide, and filled slots drag to reorder. Done, Escape, or a click
 elsewhere finishes.
+
+Chronological organization shows a project-initial badge to the left of each thread,
+with the full project name on hover. Use
+`bb thread-list prefs set organizationMode chronological` to list threads across
+projects without project headers.
 
 Organize → Rows → Provider icons toggles the icon before each thread title.
 `showProviderIcons` defaults to `true`; use
@@ -90,3 +122,57 @@ and general thread groups start unsectioned and unpinned. Environment rows
 reuse their environment and the containing group's placement. In Pinned,
 they retain the group's common underlying section for unpinning; mixed-section
 groups use no underlying section.
+
+## Manual pipeline and keyboard moves
+
+Custom sections are manual workflow stages. Create them with
+`bb thread section create Completed` and `bb thread section create Active`.
+For Completed → Active → Queued, set `threadsSectionLabel` to `Queued` and
+`manualSectionOrder` to `["section:<completedId>","section:<activeId>","threads"]`.
+Set `chronologicalSort` to `manual` for persistent ordering; `manualThreadOrder`
+is the thread-id list (default `[]`). New unsectioned threads appear in Queued.
+These stages do not start, stop, or archive agent runs.
+
+Command+Up/Down moves the focused sidebar thread, or the open thread, to the
+previous/next section. Option+Up/Down reorders siblings within that section and
+switches the list to Manual sorting. Neither wraps at boundaries. Moves animate
+unless Reduce Motion is enabled. Pinned threads retain their existing pin order
+and use the core pin reorder API. Right-click → Move to offers every custom
+section; moving a child into a section detaches it from its parent.
+
+Rebind through Settings → Keyboard or `bb settings keyboard set`, using command
+ids `plugin:thread-list/section-up`, `plugin:thread-list/section-down`,
+`plugin:thread-list/order-up`, and `plugin:thread-list/order-down`.
+The command palette exposes the same operations. API clients can use
+`threads.update({threadId, sectionId})`, `threadSections`, and the thread-list
+`setPreference` RPC for the same section and manual-order state.
+
+Set `autoActiveSectionId` to the Active section id to move a queued root thread
+to that section when it starts running:
+`bb thread-list prefs set autoActiveSectionId <active-section-id>`.
+The default is `null` (disabled). The backend rechecks current placement and only
+promotes unsectioned, unpinned, unarchived root threads. It prepends the thread to
+manual order, selects Manual sorting, and disables read-status grouping so the
+newly active thread appears at the top. When a thread in that Active section becomes
+idle, it returns to the top of the unsectioned queue, selecting Manual sorting
+and disabling read-status grouping so it stays first. Threads
+in Completed or another section stay there, including after another run. The
+backend rereads current status and placement before moving a thread, so stale
+finish events do not move a newly running thread or override a manual move.
+Deleted destinations are ignored. Reset the preference
+to disable the rule. The `setPreference` RPC accepts the same key and value.
+
+Sidebar keyboard selection uses core `sidebar.focus` (Command+Left on macOS)
+and `chat.focus` (Command+Right). Arrow Up/Down selects a thread without opening
+it; Enter opens it, or starts inline rename when it is already open. The selector has an outline. `sidebar.archiveSelected`
+(Mod+Backspace) archives the selected row using the same core action as its
+menu and preserves a neighboring selector. Pipeline movement commands target
+the focused row, so Option+Up/Down reorders the selector's thread. Returning
+from chat restores the last sidebar selection. Focus shortcuts and archive
+are rebindable through core Keyboard settings.
+
+## Thread origin
+
+Search results show a `bb` badge for BB-created threads and `Codex` for native Codex imports. Sidebar Codex icons are purple for BB-created threads and keep their normal color for native imports; their tooltip states the origin. Continuing an imported conversation in BB preserves its origin. Hiding provider icons also hides this sidebar cue.
+
+The SDK thread list and search responses expose `creationSource` (`bb` or `native`), also visible through `bb thread list --json`. Sidebar plugins receive `PluginSidebarThread.experimental_creationSource`; older hosts omit it.

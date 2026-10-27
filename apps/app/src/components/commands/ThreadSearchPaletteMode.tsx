@@ -13,6 +13,10 @@ import { useAtom, useAtomValue, useStore } from "jotai";
 import { isMacKeyboardPlatform } from "@bb/domain";
 import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { Icon } from "@bb/shared-ui/icon";
+import {
+  BB_THREAD_ORIGIN_COLOR,
+  threadOrigin,
+} from "@bb/shared-ui/thread-origin";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@bb/shared-ui/tooltip";
 import { cn } from "@bb/shared-ui/lib/utils";
 import {
@@ -546,16 +550,36 @@ export function ThreadSearchPaletteMode({
 }
 
 function ThreadSearchPaletteRow({ row }: { row: PaletteThreadSearchRow }) {
+  const origin = threadOrigin(row.thread.creationSource, row.thread.providerId);
   const metadata = [row.projectName, row.relativeTime]
     .filter(Boolean)
     .join(" · ");
   return (
     <span className="min-w-0 flex-1">
-      <PaletteMatchText
-        text={row.primaryText}
-        highlightRanges={row.highlightRanges}
-        className="text-foreground"
-      />
+      <span className="flex min-w-0 items-center gap-2">
+        <PaletteMatchText
+          text={row.primaryText}
+          highlightRanges={row.highlightRanges}
+          className="min-w-0 text-foreground"
+        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="shrink-0 rounded-sm border border-current/15 bg-current/5 px-1.5 py-0.5 text-2xs font-medium leading-none text-muted-foreground"
+              style={
+                origin.label === "bb"
+                  ? { color: BB_THREAD_ORIGIN_COLOR }
+                  : undefined
+              }
+              aria-label={origin.description}
+              data-palette-thread-origin={row.thread.creationSource}
+            >
+              {origin.label}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{origin.description}</TooltipContent>
+        </Tooltip>
+      </span>
       <span
         className="flex min-h-4 items-center gap-1.5"
         data-palette-thread-details

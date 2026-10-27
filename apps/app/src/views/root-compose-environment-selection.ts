@@ -1,12 +1,9 @@
-import {
-  findLocalPathProjectSourceForHost,
-  type ProjectSource,
-  type ThreadListEntry,
-} from "@bb/domain";
+import { type ProjectSource, type ThreadListEntry } from "@bb/domain";
 import type { SystemEnvironmentProvider } from "@bb/server-contract";
 import {
   PERSONAL_WORKSPACE_ENVIRONMENT_PROVIDER_ID,
   PROJECT_CHECKOUT_ENVIRONMENT_PROVIDER_ID,
+  PROJECT_WORKSPACE_ENVIRONMENT_PROVIDER_ID,
 } from "@bb/client-core";
 import {
   encodeProviderValue,
@@ -264,13 +261,18 @@ export function resolveRootComposeEffectiveEnvironmentValue({
           (provider) => provider.id === parsedSelection.environmentProviderId,
         )
       : undefined;
+  const sourceCount = projectSources.filter(
+    (source) => source.hostId === primaryHostId,
+  ).length;
+  const defaultProviderId =
+    sourceCount === 1
+      ? PROJECT_CHECKOUT_ENVIRONMENT_PROVIDER_ID
+      : PROJECT_WORKSPACE_ENVIRONMENT_PROVIDER_ID;
   const fallbackValue =
     primaryHostId !== null &&
     knownHostIds.has(primaryHostId) &&
-    findLocalPathProjectSourceForHost(projectSources, primaryHostId) !==
-      undefined &&
-    providerRegistered(PROJECT_CHECKOUT_ENVIRONMENT_PROVIDER_ID)
-      ? encodeProviderValue(PROJECT_CHECKOUT_ENVIRONMENT_PROVIDER_ID)
+    providerRegistered(defaultProviderId)
+      ? encodeProviderValue(defaultProviderId)
       : "";
 
   if (parsedSelection?.type === "reuse") {

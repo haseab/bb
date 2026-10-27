@@ -16,6 +16,7 @@ import { ProjectActionsProvider } from "@/components/project/ProjectActionsProvi
 import { ThreadActionsProvider } from "@/components/thread/ThreadActionsProvider";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarThreadEntriesProvider } from "@/lib/sidebar-thread-entries";
 import { MessageActionBar } from "@/components/thread/timeline/MessageActionBar";
 import {
   removePluginSlotRegistrations,
@@ -135,17 +136,19 @@ function renderAppSidebar() {
               <QuickCreateProjectProvider>
                 <ProjectActionsProvider>
                   <ThreadActionsProvider>
-                    <SidebarProvider>
-                      <AppSidebar
-                        onResizeMouseDown={() => {}}
-                        isResizing={false}
-                        isBodyHidden={false}
-                        navigation={{ kind: "loading", placement: "rail" }}
-                        settingsRoutePath="/settings"
-                        isSettingsActive={false}
-                        alternateBody={null}
-                      />
-                    </SidebarProvider>
+                    <SidebarThreadEntriesProvider navigation={undefined}>
+                      <SidebarProvider>
+                        <AppSidebar
+                          onResizeMouseDown={() => {}}
+                          isResizing={false}
+                          isBodyHidden={false}
+                          navigation={{ kind: "loading", placement: "rail" }}
+                          settingsRoutePath="/settings"
+                          isSettingsActive={false}
+                          alternateBody={null}
+                        />
+                      </SidebarProvider>
+                    </SidebarThreadEntriesProvider>
                   </ThreadActionsProvider>
                 </ProjectActionsProvider>
               </QuickCreateProjectProvider>

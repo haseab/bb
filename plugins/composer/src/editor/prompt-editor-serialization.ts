@@ -1,3 +1,4 @@
+import { promptMarkdownContent, promptMarkdownInline } from "./prompt-markdown";
 import * as z from "zod/mini";
 import type { ComposerMention } from "@get-bb/plugin-sdk/app";
 import type { JSONContent } from "@tiptap/react";
@@ -230,6 +231,17 @@ export function promptEditorContentFromValue(
     };
   }
 
+  const rich = promptMarkdownContent(value.text, (from, to) =>
+    rawPromptEditorInlineContentFromValue(
+      promptEditorContentValueFromSourceSpan({
+        sourceStart: from,
+        sourceEnd: to,
+        value,
+      }),
+    ),
+  );
+  if (rich) return rich;
+
   const lines = value.text.split("\n");
   const lineGlobalStarts: number[] = [];
   let offset = 0;
@@ -274,6 +286,22 @@ export function promptEditorContentFromValue(
 }
 
 export function promptEditorInlineContentFromValue(
+  value: PromptEditorContentValue,
+): JSONContent[] {
+  return (
+    promptMarkdownInline(value.text, (from, to) =>
+      rawPromptEditorInlineContentFromValue(
+        promptEditorContentValueFromSourceSpan({
+          sourceStart: from,
+          sourceEnd: to,
+          value,
+        }),
+      ),
+    ) ?? rawPromptEditorInlineContentFromValue(value)
+  );
+}
+
+function rawPromptEditorInlineContentFromValue(
   value: PromptEditorContentValue,
 ): JSONContent[] {
   const content: JSONContent[] = [];
@@ -326,15 +354,41 @@ function serializePromptEditorNode(
     return { start, end: text.length };
   };
 
-  const appendBlockBoundary = (blockIsBlockquote: boolean) => {
+  const appendBlockBoundary = (
+    blockIsBlockquote: boolean,
+    node?: ProseMirrorNode,
+  ) => {
     if (previousSerializedBlockWasBlockquote !== null) {
       text +=
-        previousSerializedBlockWasBlockquote && !blockIsBlockquote
-          ? "\n\n"
-          : "\n";
+        typeof node?.attrs.markdownBefore === "string"
+          ? node.attrs.markdownBefore
+          : previousSerializedBlockWasBlockquote && !blockIsBlockquote
+            ? "\n\n"
+            : "\n";
     }
     previousSerializedBlockWasBlockquote = blockIsBlockquote;
   };
+
+  const delimitersFor = (node: ProseMirrorNode) =>
+    node.marks.map((mark): [string, string] => {
+      const delimiter =
+        typeof mark.attrs.markdownDelimiter === "string"
+          ? mark.attrs.markdownDelimiter
+          : null;
+      if (mark.type.name === "bold")
+        return [delimiter ?? "**", delimiter ?? "**"];
+      if (mark.type.name === "italic")
+        return [delimiter ?? "_", delimiter ?? "_"];
+      if (mark.type.name === "strike") return ["~~", "~~"];
+      if (mark.type.name === "code")
+        return [delimiter ?? "`", delimiter ?? "`"];
+      if (mark.type.name === "link")
+        return [
+          "[",
+          `](${mark.attrs.href}${mark.attrs.title ? ` "${mark.attrs.title}"` : ""})`,
+        ];
+      return ["", ""];
+    });
 
   const appendInline = (node: ProseMirrorNode, nodePosition: number) => {
     if (node.type.name === "text") {
@@ -432,14 +486,66 @@ function serializePromptEditorNode(
     }
 
     if (node.type.name === "blockquote") {
-      appendBlockBoundary(true);
+      appendBlockBoundary(true, node);
       appendBlockquote(node, nodePosition);
       return;
     }
 
+    if (node.type.name === "bulletList" || node.type.name === "orderedList") {
+      appendBlockBoundary(false, node);
+      node.forEach((item, offset, index) => {
+        if (index > 0) text += "\n";
+        const start = text.length;
+        const itemValue = serializePromptEditorNode(
+          item,
+          nodePosition + 1 + offset,
+        );
+        const marker =
+          node.type.name === "orderedList"
+            ? `${Number(node.attrs.start ?? 1) + index}. `
+            : (node.attrs.markdownPrefix ?? "- ");
+        const lines = itemValue.text.split("\n");
+        const prefixOffset = (value: number) =>
+          marker.length +
+          value +
+          (itemValue.text.slice(0, value).match(/\n/g)?.length ?? 0) *
+            marker.length;
+        text += lines
+          .map(
+            (line, lineIndex) =>
+              (lineIndex === 0 ? marker : " ".repeat(marker.length)) + line,
+          )
+          .join("\n");
+        offsetMapping.push(
+          ...itemValue.offsetMapping.map((segment) => ({
+            ...segment,
+            textFrom: start + prefixOffset(segment.textFrom),
+            textTo: start + prefixOffset(segment.textTo),
+          })),
+        );
+        mentions.push(
+          ...itemValue.mentions.map((mention) => ({
+            ...mention,
+            from: start + prefixOffset(mention.from),
+            to: start + prefixOffset(mention.to),
+          })),
+        );
+      });
+      return;
+    }
+    if (node.type.name === "horizontalRule") {
+      appendBlockBoundary(false, node);
+      text += "---";
+      return;
+    }
     if (node.isBlock && node.type.name !== "doc") {
-      appendBlockBoundary(false);
+      appendBlockBoundary(false, node);
+      if (node.type.name === "heading")
+        text += "#".repeat(Number(node.attrs.level)) + " ";
+      if (node.type.name === "codeBlock")
+        text += "```" + (node.attrs.language ?? "") + "\n";
       appendChildren(node, nodePosition);
+      if (node.type.name === "codeBlock") text += "\n```";
       return;
     }
     appendChildren(node, nodePosition);
@@ -448,11 +554,34 @@ function serializePromptEditorNode(
   const appendChildren = (node: ProseMirrorNode, nodePosition: number) => {
     let childPosition =
       node.type.name === "doc" ? nodePosition : nodePosition + 1;
+    let active: [string, string][] = [];
+    const syncMarks = (next: [string, string][]) => {
+      let shared = 0;
+      while (
+        shared < active.length &&
+        shared < next.length &&
+        active[shared]![0] === next[shared]![0] &&
+        active[shared]![1] === next[shared]![1]
+      )
+        shared += 1;
+      text += active
+        .slice(shared)
+        .reverse()
+        .map(([, close]) => close)
+        .join("");
+      text += next
+        .slice(shared)
+        .map(([open]) => open)
+        .join("");
+      active = next;
+    };
     for (let index = 0; index < node.childCount; index += 1) {
       const child = node.child(index);
+      syncMarks(child.isInline ? delimitersFor(child) : []);
       appendNode(child, childPosition);
       childPosition += child.nodeSize;
     }
+    syncMarks([]);
   };
 
   appendChildren(doc, rootPosition);

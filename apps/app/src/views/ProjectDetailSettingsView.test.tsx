@@ -208,7 +208,9 @@ describe("ProjectDetailSettingsView", () => {
     expect(
       screen.getByText("github.com/get-bb/bb · 1 of 3 machines · 1 thread"),
     ).toBeDefined();
-    expect(screen.getAllByText("Not set up on this machine")).toHaveLength(2);
+    expect(
+      screen.getAllByText("No folders attached on this machine"),
+    ).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Set up" })).toBeDefined();
     expect(
       screen.getByRole("button", { name: "Offline" }).hasAttribute("disabled"),
@@ -235,7 +237,9 @@ describe("ProjectDetailSettingsView", () => {
     renderView();
     fireEvent.click(await screen.findByRole("button", { name: "Set up" }));
 
-    expect(await screen.findByText("Add project source")).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { name: "Add folder" }),
+    ).toBeDefined();
   });
 
   it("refuses to remove the last checkout but removes an extra one", async () => {
@@ -247,11 +251,11 @@ describe("ProjectDetailSettingsView", () => {
 
     renderView();
     fireEvent.pointerDown(
-      await screen.findByRole("button", { name: "dev-vm checkout actions" }),
+      await screen.findByRole("button", { name: "dev-vm folder actions" }),
       { button: 0 },
     );
     fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Remove checkout" }),
+      await screen.findByRole("menuitem", { name: "Remove folder" }),
     );
     fireEvent.click(await screen.findByRole("button", { name: /^Remove/ }));
 
@@ -263,7 +267,7 @@ describe("ProjectDetailSettingsView", () => {
     );
   });
 
-  it("disables removal when the project has a single checkout", async () => {
+  it("allows removing the last folder attachment", async () => {
     stubSidebarBootstrapFetch([
       { hostId: "host_primary", path: "/Users/me/bb" },
     ]);
@@ -271,15 +275,15 @@ describe("ProjectDetailSettingsView", () => {
     renderView();
     fireEvent.pointerDown(
       await screen.findByRole("button", {
-        name: "MacBook Pro checkout actions",
+        name: "MacBook Pro folder actions",
       }),
       { button: 0 },
     );
 
     const remove = await screen.findByRole("menuitem", {
-      name: "Remove checkout",
+      name: "Remove folder",
     });
-    expect(remove.getAttribute("aria-disabled")).toBe("true");
+    expect(remove.getAttribute("aria-disabled")).not.toBe("true");
   });
 
   it("shows derived thread defaults when the project has run threads", async () => {

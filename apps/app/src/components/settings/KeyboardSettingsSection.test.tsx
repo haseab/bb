@@ -429,11 +429,24 @@ describe("KeyboardSettingsSection", () => {
       },
     );
 
-    expect(
-      screen
-        .getAllByRole("button", { name: /^Record shortcut for / })[0]
-        ?.getAttribute("aria-label"),
-    ).toMatch(/^Record shortcut for Toggle sidebar,/);
+    const labels = screen
+      .getAllByRole("button", { name: /^Record shortcut for / })
+      .map(
+        (button) =>
+          button.getAttribute("aria-label")?.split(", current shortcut")[0],
+      );
+    const descriptionMatch = labels.indexOf(
+      "Record shortcut for Previous thread",
+    );
+    for (const label of [
+      "Toggle sidebar",
+      "Focus thread sidebar",
+      "Archive selected sidebar thread",
+    ]) {
+      const index = labels.indexOf(`Record shortcut for ${label}`);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(index).toBeLessThan(descriptionMatch);
+    }
   });
 
   it("ranks exact labels, label prefixes, label substrings, IDs, and descriptions in order", () => {
@@ -468,7 +481,17 @@ describe("KeyboardSettingsSection", () => {
         (recorder) =>
           recorder.getAttribute("aria-label")?.split(", current shortcut")[0],
       );
-    expect(labels.slice(0, 6)).toEqual([
+    const rankedLabels = [
+      "Record shortcut for Sidebar",
+      "Record shortcut for Sidebar tools",
+      "Record shortcut for Sidebar settings",
+      "Record shortcut for Toggle sidebar",
+      "Record shortcut for Open navigation",
+      "Record shortcut for Previous thread",
+    ];
+    expect(
+      labels.filter((label) => rankedLabels.includes(label ?? "")),
+    ).toEqual([
       "Record shortcut for Sidebar",
       "Record shortcut for Sidebar tools",
       "Record shortcut for Sidebar settings",

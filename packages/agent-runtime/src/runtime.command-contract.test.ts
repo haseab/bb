@@ -101,7 +101,7 @@ describe("createAgentRuntime command contracts", () => {
     return { record, runtime };
   }
 
-  it("passes runtime workspace-write roots to the provider as provider options", async () => {
+  it("preserves runtime roots alongside project folders in provider session options", async () => {
     const additionalWorkspaceWriteRoots = [
       "/repo/.git/worktrees/bb13",
       "/repo/.git/objects",
@@ -117,7 +117,16 @@ describe("createAgentRuntime command contracts", () => {
         threadId: "t1",
         projectId: "p1",
         providerId: "fake",
-        options: fullRuntimeOptions,
+        options: {
+          ...fullRuntimeOptions,
+          providerOptions: {
+            additionalWorkspaceWriteRoots: [
+              "/work/api",
+              "/work/web",
+              additionalWorkspaceWriteRoots[0],
+            ],
+          },
+        },
       });
       expect(record.last("model/list")?.params).toEqual({
         providerOptions: { additionalWorkspaceWriteRoots },
@@ -126,7 +135,15 @@ describe("createAgentRuntime command contracts", () => {
       expect(record.last("thread/start")?.params).toMatchObject({
         threadId: "t1",
         cwd: tmpDir,
-        options: { providerOptions: { additionalWorkspaceWriteRoots } },
+        options: {
+          providerOptions: {
+            additionalWorkspaceWriteRoots: [
+              ...additionalWorkspaceWriteRoots,
+              "/work/api",
+              "/work/web",
+            ],
+          },
+        },
       });
     } finally {
       await runtime.shutdown();

@@ -69,15 +69,13 @@ function createFakeWorkspaceHost() {
   };
 }
 
-async function setup() {
+async function setupWorkspace(providerId: string) {
   const host = createFakeWorkspaceHost();
   const { bb, harness } = createFakePluginHost({
     experimental_callHostRpc: (call) => host.call(call),
   });
   await plugin(bb);
-  const provider = harness.registrations.environmentProviders.get(
-    PERSONAL_WORKSPACE_ENVIRONMENT_PROVIDER_ID,
-  );
+  const provider = harness.registrations.environmentProviders.get(providerId);
   if (provider === undefined) throw new Error("Provider not registered");
   const steps: string[] = [];
   const logs: string[] = [];
@@ -87,7 +85,10 @@ async function setup() {
   };
   const context: PluginEnvironmentProviderCreateContext = {
     thread: makeThreadResponse({ id: THREAD_ID, projectId: PROJECT_ID }),
-    project: PERSONAL_PROJECT,
+    project:
+      providerId === PERSONAL_WORKSPACE_ENVIRONMENT_PROVIDER_ID
+        ? PERSONAL_PROJECT
+        : { ...PERSONAL_PROJECT, id: "proj_research", kind: "standard" },
     host: PROVISION_HOST,
     projectCheckout: null,
     gitRemote: null,
@@ -102,7 +103,11 @@ async function setup() {
   return { host, harness, provider, context, steps, logs };
 }
 
-describe("personal workspace resource operations", () => {
+describe.each([
+  PERSONAL_WORKSPACE_ENVIRONMENT_PROVIDER_ID,
+  "project-workspace",
+])("%s resource operations", (providerId) => {
+  const setup = () => setupWorkspace(providerId);
   it("creates the directory for the path key core supplies", async () => {
     const f = await setup();
     expect(await f.provider.create(f.context)).toEqual({
@@ -110,7 +115,11 @@ describe("personal workspace resource operations", () => {
       path: WORKSPACE_PATH,
       ownsPath: true,
     });
-    expect(f.steps).toEqual(["Preparing personal workspace…"]);
+    expect(f.steps).toEqual([
+      providerId === "project-workspace"
+        ? "Preparing project workspace…"
+        : "Preparing personal workspace…",
+    ]);
     expect([...f.host.directories]).toEqual([WORKSPACE_PATH]);
   });
   it("keeps distinct path keys in distinct directories", async () => {

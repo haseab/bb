@@ -1,5 +1,7 @@
+import { isNativeSessionActive } from "./native-session-sync.js";
 import {
   getEnvironment,
+  listActiveNativeSessionThreadIds,
   getSessionById,
   listActiveBackgroundTaskCountsByThreadIds,
   listLatestClosedSessionsForHosts,
@@ -87,6 +89,7 @@ interface ToThreadListEntryResponsesArgs {
 }
 
 interface ToThreadListEntryResponseFromLatestSessionArgs {
+  nativeActive: boolean;
   activity: ThreadActivityState;
   hostConnected: boolean;
   latestClosedSession: HostDaemonSessionRow | null;
@@ -320,11 +323,14 @@ function toThreadResponseWithHost(
   const thread = toPublicThread(args.thread);
   return {
     ...thread,
-    runtime: resolveThreadRuntimeState(deps, {
-      environmentHostId: args.environmentHostId,
-      now: args.now,
-      status: thread.status,
-    }),
+    runtime:
+      thread.status === "idle" && isNativeSessionActive(deps.db, thread.id)
+        ? { displayStatus: "active" }
+        : resolveThreadRuntimeState(deps, {
+            environmentHostId: args.environmentHostId,
+            now: args.now,
+            status: thread.status,
+          }),
   };
 }
 
@@ -558,8 +564,15 @@ export function toThreadListEntryResponses(
     deps,
     args.threads,
   );
+  const nativeActiveIds = new Set(
+    listActiveNativeSessionThreadIds(
+      deps.db,
+      args.threads.map((thread) => thread.id),
+    ),
+  );
   return args.threads.map((thread) => {
     const entry = toThreadListEntryResponseFromLatestSession({
+      nativeActive: nativeActiveIds.has(thread.id),
       activity: activityByThreadId.get(thread.id) ?? EMPTY_THREAD_ACTIVITY,
       queuedWork: queuedWorkByThreadId.get(thread.id) ?? "none",
       hostConnected:
@@ -588,6 +601,7 @@ function toThreadListEntryResponseFromLatestSession(
   const thread = toPublicThread(args.thread);
   return {
     ...thread,
+    creationSource: args.thread.creationSource,
     activity: args.activity,
     queuedWork: args.queuedWork,
     pinSortKey: args.thread.pinSortKey,
@@ -602,12 +616,15 @@ function toThreadListEntryResponseFromLatestSession(
       isWorktree: args.thread.environmentIsWorktree,
     }),
     hasPendingInteraction: args.thread.hasPendingInteraction,
-    runtime: resolveThreadRuntimeStateFromLatestSession({
-      environmentHostId: args.thread.environmentHostId,
-      hostConnected: args.hostConnected,
-      latestClosedSession: args.latestClosedSession,
-      now: args.now,
-      status: thread.status,
-    }),
+    runtime:
+      thread.status === "idle" && args.nativeActive
+        ? { displayStatus: "active" }
+        : resolveThreadRuntimeStateFromLatestSession({
+            environmentHostId: args.thread.environmentHostId,
+            hostConnected: args.hostConnected,
+            latestClosedSession: args.latestClosedSession,
+            now: args.now,
+            status: thread.status,
+          }),
   };
 }

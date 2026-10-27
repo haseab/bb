@@ -9,7 +9,7 @@ import {
 import type { TerminalOutputChunk, TerminalSession } from "@bb/server-contract";
 import { useMediaQuery } from "@bb/shared-ui/hooks/use-media-query";
 import { AddMachineDialog } from "@/components/dialogs/AddMachineDialog";
-import { ProjectPathDialog } from "@/components/dialogs/ProjectPathDialog";
+import { ProjectCreateDialog } from "@/components/dialogs/ProjectCreateDialog";
 import { PluginSettingsSections } from "@/components/plugin/PluginSettingsSections";
 import { useSetPluginEnabled } from "@/components/plugin/useSetPluginEnabled";
 import {
@@ -678,15 +678,11 @@ function ProjectsStepContainer({
           void refetchRepos().finally(() => setRescanning(false));
         }}
       />
-      <ProjectPathDialog
-        target={quickCreateProject.projectPathDialog.target}
+      <ProjectCreateDialog
+        open={quickCreateProject.isOpen}
         pending={quickCreateProject.isCreating}
-        platform={quickCreateProject.platform}
-        hostId={quickCreateProject.hostId}
-        hostName={quickCreateProject.hostName}
-        hosts={quickCreateProject.hosts}
-        onOpenChange={quickCreateProject.projectPathDialog.onOpenChange}
-        onSubmit={quickCreateProject.submitProjectPath}
+        onOpenChange={quickCreateProject.onOpenChange}
+        onCreate={quickCreateProject.createProject}
       />
     </OnboardingLayout>
   );

@@ -1,5 +1,6 @@
 import {
   createProjectSource,
+  createProject,
   getEnvironment,
   getThread,
   updateHost,
@@ -20,7 +21,10 @@ import {
   seedProjectWithSource,
 } from "../helpers/seed.js";
 import { withTestHarness, type TestAppHarness } from "../helpers/test-app.js";
-import { installFakeGitWorktreeProvider } from "../helpers/environment-provider.js";
+import {
+  installFakeGitWorktreeProvider,
+  installFakeEnvironmentProvider,
+} from "../helpers/environment-provider.js";
 
 interface CreateThreadBodyOverrides {
   environment: unknown;
@@ -66,7 +70,55 @@ async function createAndCaptureIntent(
   return { intent, threadId: thread.id };
 }
 
+function installProjectWorkspaceProvider() {
+  return installFakeEnvironmentProvider({
+    id: "project-workspace",
+    pluginId: "environment-personal-workspace",
+    displayName: "Project workspace",
+    requires: {
+      projectCheckout: false,
+      gitCheckout: false,
+      gitRemote: false,
+      projectless: false,
+    },
+    decide: () => ({ action: "wait", reason: "Preparing workspace" }),
+  });
+}
+
 describe("project-default thread environment", () => {
+  it.each([{ folders: [] }, { folders: ["/work/api", "/work/web"] }])(
+    "uses a project workspace for folders %j",
+    async ({ folders }) => {
+      await withTestHarness(async (harness) => {
+        installProjectWorkspaceProvider();
+        const { host } = seedHostSession(harness.deps, {
+          id: "host-independent-project",
+        });
+        seedPrimaryHost(harness.deps, host.id);
+        const { project } = createProject(harness.db, harness.hub, {
+          name: "Product",
+        });
+        for (const path of folders) {
+          createProjectSource(harness.db, harness.hub, {
+            projectId: project.id,
+            type: "local_path",
+            hostId: host.id,
+            path,
+          });
+        }
+        const { intent } = await createAndCaptureIntent(harness, {
+          projectId: project.id,
+          environment: { type: "project-default" },
+        });
+        expect(intent).toMatchObject({
+          type: "provider",
+          environmentProviderId: "project-workspace",
+          machine: { type: "existing", hostId: host.id },
+        });
+      });
+    },
+  );
+
   it("resolves project-default to the worktree provider on the source's default branch", async () => {
     await withTestHarness(async (harness) => {
       installFakeGitWorktreeProvider();
@@ -396,9 +448,9 @@ describe("project-default machine", () => {
     });
   });
 
-  it("keeps the missing-source error when only a temporary machine has a source", async () => {
+  it("uses a managed directory on the primary machine when folders exist only on a temporary machine", async () => {
     await withTestHarness(async (harness) => {
-      installFakeGitWorktreeProvider();
+      installProjectWorkspaceProvider();
       const { host: primary } = seedHostSession(harness.deps, {
         id: "host-primary",
       });
@@ -416,9 +468,15 @@ describe("project-default machine", () => {
         environment: { type: "project-default" },
       });
 
-      expect(response.status).toBe(404);
-      expect(await readJson(response)).toMatchObject({
-        message: "Project has no local-path source for host",
+      expect(response.status).toBe(201);
+      const thread = threadSchema.parse(await readJson(response));
+      expect(
+        getThreadProvisionContext(harness.db, thread.id)?.request
+          .environmentIntent,
+      ).toMatchObject({
+        type: "provider",
+        environmentProviderId: "project-workspace",
+        machine: { type: "existing", hostId: primary.id },
       });
     });
   });

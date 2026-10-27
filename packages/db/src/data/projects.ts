@@ -23,7 +23,7 @@ export type CreateProjectSourceInput = CreateProjectLocalPathSourceInput;
 
 export interface CreateProjectInput {
   name: string;
-  source: CreateProjectSourceInput;
+  source?: CreateProjectSourceInput;
 }
 
 export type ProjectRow = typeof projects.$inferSelect;
@@ -141,7 +141,6 @@ export function getPublicProjectByLocalPathSource(
 function insertProject(tx: DbTransaction, input: CreateProjectInput) {
   const now = Date.now();
   const projectId = createProjectId();
-  const sourceId = createProjectSourceId();
   const lastProject = getLastPublicProject(tx);
   const sortKey = lastProject
     ? createOrderKeyAfter({ previousKey: lastProject.sortKey })
@@ -157,10 +156,11 @@ function insertProject(tx: DbTransaction, input: CreateProjectInput) {
     })
     .returning()
     .get();
+  if (input.source === undefined) return { project, source: null };
   const source = tx
     .insert(projectSources)
     .values({
-      id: sourceId,
+      id: createProjectSourceId(),
       projectId,
       type: input.source.type,
       hostId: input.source.hostId,
@@ -196,17 +196,27 @@ function resolveProjectNeighbor(
 export function createProject(
   db: DbConnection,
   notifier: DbNotifier,
+  input: CreateProjectInput & { source: CreateProjectSourceInput },
+): { project: ProjectRow; source: ReturnType<typeof toProjectSource> };
+export function createProject(
+  db: DbConnection,
+  notifier: DbNotifier,
+  input: CreateProjectInput,
+): { project: ProjectRow; source: ReturnType<typeof toProjectSource> | null };
+export function createProject(
+  db: DbConnection,
+  notifier: DbNotifier,
   input: CreateProjectInput,
 ) {
   const { project, source } = db.transaction((tx) => insertProject(tx, input));
   notifyProjectCreated(notifier, project.id);
-  return { project, source: toProjectSource(source) };
+  return { project, source: source === null ? null : toProjectSource(source) };
 }
 
 export function findOrCreateProjectByLocalPathSource(
   db: DbConnection,
   notifier: DbNotifier,
-  input: CreateProjectInput,
+  input: CreateProjectInput & { source: CreateProjectSourceInput },
 ) {
   const { created, project, source } = db.transaction(
     (tx) => {
@@ -222,7 +232,7 @@ export function findOrCreateProjectByLocalPathSource(
   if (created) {
     notifyProjectCreated(notifier, project.id);
   }
-  return { project, source: toProjectSource(source) };
+  return { project, source: source === null ? null : toProjectSource(source) };
 }
 
 const prepareGetProject = (db: DbQueryConnection) =>
@@ -241,15 +251,19 @@ export function getPersonalProject(db: DbConnection) {
     db
       .select()
       .from(projects)
-      .where(and(eq(projects.id, PERSONAL_PROJECT_ID), eq(projects.kind, "personal")))
+      .where(
+        and(
+          eq(projects.id, PERSONAL_PROJECT_ID),
+          eq(projects.kind, "personal"),
+        ),
+      )
       .get() ?? null
   );
 }
 
 export function ensurePersonalProject(db: DbConnection) {
   const now = Date.now();
-  db
-    .insert(projects)
+  db.insert(projects)
     .values({
       id: PERSONAL_PROJECT_ID,
       kind: "personal",
@@ -377,7 +391,8 @@ export function reorderProject({
       );
       const currentPreviousProjectId =
         currentProjects[currentIndex - 1]?.id ?? null;
-      const currentNextProjectId = currentProjects[currentIndex + 1]?.id ?? null;
+      const currentNextProjectId =
+        currentProjects[currentIndex + 1]?.id ?? null;
       if (
         currentPreviousProjectId === previousProjectId &&
         currentNextProjectId === nextProjectId

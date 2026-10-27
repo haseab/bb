@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./thread-origin": {
+      "source": "./src/components/ui/thread-origin.ts",
+      "types": "./src/components/ui/thread-origin.ts",
+      "default": "./src/components/ui/thread-origin.ts"
+    },
     "./expandable-text": {
       "source": "./src/components/ui/expandable-text.tsx",
       "types": "./src/components/ui/expandable-text.tsx",
@@ -248,6 +253,11 @@
       "source": "./src/components/ui/hooks/use-pointer-coarse.ts",
       "types": "./src/components/ui/hooks/use-pointer-coarse.ts",
       "default": "./src/components/ui/hooks/use-pointer-coarse.ts"
+    },
+    "./project-identity": {
+      "source": "./src/components/ui/project-identity.ts",
+      "types": "./src/components/ui/project-identity.ts",
+      "default": "./src/components/ui/project-identity.ts"
     },
     "./lib/utils": {
       "source": "./src/lib/utils.ts",

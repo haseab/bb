@@ -60,6 +60,7 @@ import {
   shouldUseMacosDesktopChrome,
 } from "@/lib/bb-desktop";
 import { NavRailSettingsButton } from "./NavRailSettingsButton";
+import { SidebarVersion } from "./SidebarVersion";
 import { SidebarNavigationHeader } from "./SidebarNavigationHeader";
 import {
   SidebarNavigationProviderMount,
@@ -72,6 +73,8 @@ import {
 } from "./sidebarNavigationProvider";
 
 import { NAV_RAIL_WIDTH_CLASS } from "./navRailWidth";
+
+import { SidebarKeyboardControls } from "./SidebarKeyboardControls";
 
 const BUG_REPORT_NEW_ISSUE_URL = "https://github.com/get-bb/bb/issues/new";
 
@@ -126,7 +129,7 @@ export function AppSidebar({
   const handleNewChat = useCallback(() => {
     closeOnMobile();
     void navigate(getRootComposeRoutePath(), {
-      state: { focusPrompt: true },
+      state: { focusPrompt: true, chooseProject: true },
     });
   }, [closeOnMobile, navigate]);
 
@@ -264,6 +267,7 @@ export function AppSidebar({
           : "pb-(--bb-frame-footer-inset)",
       )}
     >
+      {placement === "list" ? <SidebarVersion /> : null}
       <SidebarMenu
         className={cn(
           "flex-row items-center gap-1",
@@ -385,6 +389,11 @@ export function AppSidebar({
         splitEnabled
       >
         <Sidebar ref={sidebarRef}>
+          <SidebarKeyboardControls
+            rootRef={sidebarRef}
+            activeThreadId={activeThreadId ?? null}
+            enabled={!isBodyHidden}
+          />
           <div className="grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto]">
             {placement === "rail"
               ? navigationRegion(
@@ -419,13 +428,14 @@ export function AppSidebar({
             {placement === "rail" ? (
               <div
                 className={cn(
-                  "col-start-1 row-start-2 flex shrink-0 items-center justify-center",
+                  "col-start-1 row-start-2 flex shrink-0 flex-col items-center justify-center gap-0.5",
                   NAV_RAIL_WIDTH_CLASS,
                   isFramed
-                    ? "h-(--bb-app-chrome-row-height)"
+                    ? "min-h-(--bb-app-chrome-row-height)"
                     : "bg-surface-recessed -mb-[env(safe-area-inset-bottom)] pt-2 pb-[calc(var(--bb-frame-footer-inset)_+_env(safe-area-inset-bottom))]",
                 )}
               >
+                <SidebarVersion />
                 <NavRailSettingsButton
                   isSettingsActive={isSettingsActive}
                   settingsRoutePath={settingsRoutePath}

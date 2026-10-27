@@ -1,21 +1,12 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, renderHook } from "@testing-library/react";
-import type { Host } from "@bb/domain";
-import { makeHost } from "@bb/test-helpers/domain-fixtures";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useQuickCreateProject } from "./useQuickCreateProject";
 
 const mocks = vi.hoisted(() => ({
-  hosts: [] as Host[] | undefined,
-  isLoadingHosts: false,
   mutate: vi.fn(),
   navigate: vi.fn(),
-  onClose: vi.fn(),
-  onOpen: vi.fn(),
-  onOpenChange: vi.fn(),
-  openPathEntry: vi.fn(),
-  openPicker: vi.fn(),
   setRootComposeProjectId: vi.fn(),
 }));
 
@@ -28,50 +19,9 @@ vi.mock("@/hooks/mutations/project-mutations", () => ({
   useCreateProject: () => ({ isPending: false, mutate: mocks.mutate }),
 }));
 
-vi.mock("@/hooks/queries/host-queries", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/hooks/queries/host-queries")>()),
-  useHosts: () => ({ data: mocks.hosts, isPending: mocks.isLoadingHosts }),
-}));
-
-vi.mock("@/hooks/useLocalPathPicker", () => ({
-  useLocalPathPicker: () => ({
-    isAvailable: true,
-    hostId: "host_atum",
-    hostName: "atum",
-    openPathEntry: mocks.openPathEntry,
-    openPicker: mocks.openPicker,
-    platform: "linux",
-    projectPathDialog: {
-      isOpen: false,
-      onClose: mocks.onClose,
-      onOpen: mocks.onOpen,
-      onOpenChange: mocks.onOpenChange,
-      target: null,
-    },
-    submitProjectPath: vi.fn(),
-  }),
-}));
-
 vi.mock("@/lib/root-compose-selection", () => ({
   useSetRootComposeProjectId: () => mocks.setRootComposeProjectId,
 }));
-
-function host(
-  id: string,
-  name: string,
-  status: Host["status"] = "connected",
-): Host {
-  return makeHost({
-    id,
-    name,
-    status,
-  });
-}
-
-beforeEach(() => {
-  mocks.hosts = [host("host_atum", "atum")];
-  mocks.isLoadingHosts = false;
-});
 
 afterEach(() => {
   cleanup();
@@ -79,31 +29,22 @@ afterEach(() => {
 });
 
 describe("useQuickCreateProject", () => {
-  it("delegates opening to the shared path-entry surface", () => {
+  it("opens a named project and selects it after creation without requiring a machine", () => {
     const { result } = renderHook(() => useQuickCreateProject());
-
     act(() => result.current.openCreateDialog());
-
-    expect(mocks.openPathEntry).toHaveBeenCalledWith({ kind: "create" });
-  });
-
-  it("exposes every machine for the dialog's picker", () => {
-    mocks.hosts = [
-      host("host_atum", "atum"),
-      host("host_thoth", "Thoth"),
-      makeHost({
-        id: "host_sandbox",
-        name: "Sandbox",
-        type: "ephemeral",
-        machineProviderId: "modal-sandbox",
-      }),
-    ];
-    const { result } = renderHook(() => useQuickCreateProject());
-
-    expect(result.current.hosts.map((item) => item.id)).toEqual([
-      "host_atum",
-      "host_thoth",
-      "host_sandbox",
-    ]);
+    expect(result.current.isAvailable).toBe(true);
+    expect(result.current.isOpen).toBe(true);
+    act(() => result.current.createProject("  Research  "));
+    expect(mocks.mutate).toHaveBeenCalledWith(
+      { name: "Research" },
+      expect.anything(),
+    );
+    expect(result.current.isOpen).toBe(true);
+    act(() => mocks.mutate.mock.calls[0][1].onSuccess({ id: "proj_research" }));
+    expect(result.current.isOpen).toBe(false);
+    expect(mocks.setRootComposeProjectId).toHaveBeenCalledWith("proj_research");
+    expect(mocks.navigate).toHaveBeenCalledWith(expect.any(String), {
+      replace: true,
+    });
   });
 });

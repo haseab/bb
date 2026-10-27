@@ -61,8 +61,8 @@ export type CreateProjectSourceRequest = z.infer<
 >;
 
 export const createProjectRequestSchema = z.object({
-  name: z.string().min(1),
-  source: createLocalPathProjectSourceRequestSchema,
+  name: z.string().trim().min(1),
+  source: createLocalPathProjectSourceRequestSchema.optional(),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 

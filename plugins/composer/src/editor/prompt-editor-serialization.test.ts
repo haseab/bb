@@ -25,13 +25,10 @@ describe("prompt editor serialization round-trip", () => {
     "hello there\nsecond line",
     "# Title\n- **bold**\n- _italic_\n1. `code`",
     "Open apps/app/src/snake_case_file.ts",
-  ])(
-    "round-trips literal text without applying Markdown formatting: %s",
-    (text) => {
-      const value: PromptEditorValue = { text, mentions: [] };
-      expect(roundTrip(value)).toEqual(value);
-    },
-  );
+  ])("preserves Markdown source and plain text through editing: %s", (text) => {
+    const value: PromptEditorValue = { text, mentions: [] };
+    expect(roundTrip(value)).toEqual(value);
+  });
 
   it("round-trips a single one-line quote", () => {
     const value: PromptEditorValue = { text: "> hello", mentions: [] };
@@ -250,5 +247,52 @@ describe("prompt editor serialization", () => {
       },
       { type: "text", text: " " },
     ]);
+  });
+});
+
+describe("rich Markdown composer", () => {
+  it("renders formatting as document nodes while retaining Markdown for sending", () => {
+    const text =
+      "# Heading\n\n**Bold** and _italic_ and `code`\n\n- First\n- Second";
+    const doc = Node.fromJSON(
+      schema,
+      promptEditorContentFromValue({ text, mentions: [] }),
+    );
+    expect(doc.firstChild?.type.name).toBe("heading");
+    expect(
+      doc.child(1).firstChild?.marks.map((mark) => mark.type.name),
+    ).toEqual(["bold"]);
+    expect(doc.lastChild?.type.name).toBe("bulletList");
+    expect(promptEditorValueFromDoc(doc)).toEqual({ text, mentions: [] });
+  });
+
+  it("retains formatting and source offsets around mentions", () => {
+    const text = "**Read @thread carefully**";
+    const mention: ComposerMention = {
+      kind: "thread",
+      threadId: "thr_1",
+      projectId: "proj_1",
+      label: "@thread",
+      from: 7,
+      to: 14,
+    };
+    expect(roundTrip({ text, mentions: [mention] })).toEqual({
+      text,
+      mentions: [mention],
+    });
+  });
+
+  it.each([
+    "[Documentation](https://example.com/docs)",
+    "~~Removed~~ and **bold**",
+    "> **Bold**\n> continuation",
+    "- **First**\n  continuation",
+    "3. First\n4. Second",
+    "- Parent\n  - Child",
+    "```ts\nconst value = 1;\n```",
+    "Text\n\n---\n\nMore text",
+    "**First**\n\nSecond\n\n",
+  ])("retains Markdown content: %s", (text) => {
+    expect(roundTrip({ text, mentions: [] })).toEqual({ text, mentions: [] });
   });
 });

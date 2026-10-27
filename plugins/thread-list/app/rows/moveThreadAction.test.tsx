@@ -142,19 +142,35 @@ describe("Move to section", () => {
     );
   });
 
-  it.each([
-    ["a child thread", makeTarget({ parentThreadId: "thr_parent" })],
-    ["an archived thread", makeTarget({ archivedAt: 5 })],
-  ])("is hidden for %s", async (_label, thread) => {
-    const { item, hydrated } = renderMove();
-    await hydrated();
-    expect(item(thread)).toBeNull();
-  });
+  it.each([["an archived thread", makeTarget({ archivedAt: 5 })]])(
+    "is hidden for %s",
+    async (_label, thread) => {
+      const { item, hydrated } = renderMove();
+      await hydrated();
+      expect(item(thread)).toBeNull();
+    },
+  );
 
   it("is hidden when the list is not organized chronologically", async () => {
     const { item, hydrated } = renderMove("project");
     await hydrated();
     await waitFor(() => expect(item(makeTarget())).toBeNull());
+  });
+
+  it("detaches a child when moving it into a section", async () => {
+    const { item, sdkCalls, hydrated } = renderMove();
+    await hydrated();
+    run(item(makeTarget({ parentThreadId: "thr_parent" })), "sec_b");
+    await waitFor(() =>
+      expect(sdkCalls).toEqual([
+        {
+          method: "threads.update",
+          args: [
+            { threadId: "thr_move", sectionId: "sec_b", parentThreadId: null },
+          ],
+        },
+      ]),
+    );
   });
 
   it("moves an unpinned thread with one update", async () => {

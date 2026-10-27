@@ -1,0 +1,15 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "project-identity",
+  "type": "registry:ui",
+  "title": "project-identity",
+  "description": "BB ui \"project-identity\" — vendored from the BB app's own source (version-matched to this BB release).",
+  "files": [
+    {
+      "path": "registry/components/ui/project-identity.ts",
+      "content": "import type { CSSProperties } from \"react\";\n\nconst PROJECT_BADGE_LABELS: Readonly<Record<string, string>> = {\n  personal: \"PE\",\n  deeplog: \"DL\",\n  unplan: \"UP\",\n  \"smash-leaderboard\": \"SL\",\n  general: \"GL\",\n  \"os-v2\": \"COS\",\n  \"os-web\": \"COS\",\n  inbox0: \"i0\",\n  guestbook: \"GB\",\n  retrace: \"RT\",\n};\n\nconst PROJECT_BADGE_TONES: Readonly<\n  Record<string, { hue: number; chroma: number }>\n> = {\n  PE: { hue: 95, chroma: 0.065 },\n  DL: { hue: 45, chroma: 0.045 },\n  UP: { hue: 300, chroma: 0.045 },\n  SL: { hue: 20, chroma: 0.065 },\n  GL: { hue: 240, chroma: 0 },\n  COS: { hue: 240, chroma: 0 },\n  i0: { hue: 240, chroma: 0.008 },\n  GB: { hue: 185, chroma: 0.045 },\n  RT: { hue: 265, chroma: 0.045 },\n};\n\nexport function projectBadgeStyle(label: string): CSSProperties {\n  const tone = Object.hasOwn(PROJECT_BADGE_TONES, label)\n    ? PROJECT_BADGE_TONES[label]\n    : {\n        hue:\n          Array.from(label).reduce(\n            (hash, character) => hash * 31 + (character.codePointAt(0) ?? 0),\n            0,\n          ) % 360,\n        chroma: 0.045,\n      };\n  const { hue, chroma } = tone;\n  const lightnessOffset =\n    label === \"DL\" || label === \"SL\" || label === \"PE\" ? 0.08 : 0;\n  const base = `oklch(from var(--canvas) ${0.27 + lightnessOffset} ${chroma} ${hue})`;\n  const highlight = `oklch(from var(--canvas) ${0.31 + lightnessOffset} ${chroma} ${hue})`;\n  const edge = `oklch(from var(--canvas) ${0.36 + lightnessOffset} ${chroma} ${hue})`;\n  return {\n    backgroundColor: base,\n    backgroundImage: `linear-gradient(160deg, ${highlight}, ${base} 65%)`,\n    color: `oklch(from var(--ink) ${0.8 + lightnessOffset} ${chroma * 2} ${hue})`,\n    boxShadow: `inset 0 1px 0 ${edge}`,\n  };\n}\n\nexport function projectBadgeLabel(name: string): string {\n  const normalized = name.trim();\n  const key = normalized.toLowerCase();\n  if (Object.hasOwn(PROJECT_BADGE_LABELS, key))\n    return PROJECT_BADGE_LABELS[key];\n  const words = normalized.split(/[\\s_-]+/u).filter(Boolean);\n  const initials =\n    words.length > 1\n      ? words\n          .slice(0, 2)\n          .map((word) => Array.from(word)[0])\n          .join(\"\")\n      : Array.from(normalized).slice(0, 2).join(\"\");\n  return initials.toLocaleUpperCase();\n}\n",
+      "type": "registry:ui",
+      "target": "components/ui/project-identity.ts"
+    }
+  ]
+}
