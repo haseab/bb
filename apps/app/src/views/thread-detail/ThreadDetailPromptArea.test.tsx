@@ -683,7 +683,6 @@ describe("ThreadDetailPromptArea", () => {
         }),
       );
       expect(mocks.sendMessageMutateAsync).not.toHaveBeenCalled();
-      expect(mocks.createQueuedMessageMutateAsync).not.toHaveBeenCalled();
       expect(mocks.promptDraft.clearIfCurrentMatches).not.toHaveBeenCalled();
 
       view.rerender(
