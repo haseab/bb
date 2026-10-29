@@ -64,9 +64,6 @@ afterEach(() => {
 const search = () => screen.getByRole("combobox", { name: "Search projects" });
 
 async function openPicker() {
-  const trigger = screen.getByRole("button", { name: "Choose project" });
-  if (trigger.getAttribute("aria-expanded") === "false")
-    fireEvent.click(trigger);
   await waitFor(() => expect(document.activeElement).toBe(search()));
 }
 
@@ -202,82 +199,24 @@ it("keeps the last project highlighted when project loading finishes", async () 
   await waitFor(() => expect(select).toHaveBeenCalledWith("bb"));
 });
 
-it("waits half a second, animates open, then focuses search", () => {
-  vi.useFakeTimers();
+it("shows search immediately without a selected-project disclosure", () => {
   render(<Flow />);
-  const trigger = screen.getByRole("button", { name: "Choose project" });
-  expect(trigger.getAttribute("aria-expanded")).toBe("false");
-  expect(screen.queryByRole("combobox")).toBeNull();
-  act(() => vi.advanceTimersByTime(499));
-  expect(trigger.getAttribute("aria-expanded")).toBe("false");
-  act(() => vi.advanceTimersByTime(1));
-  expect(trigger.getAttribute("aria-expanded")).toBe("true");
-  expect(screen.queryByRole("combobox")).toBeNull();
-  act(() => vi.advanceTimersByTime(300));
-  act(() => vi.advanceTimersToNextFrame());
-  expect(document.activeElement).toBe(search());
+  expect(search()).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Choose project" })).toBeNull();
+  expect(screen.getAllByText("BB")).toHaveLength(1);
 });
 
-it("opens from the keyboard and keeps text typed during expansion", () => {
-  vi.useFakeTimers();
-  render(<Flow />);
-  const trigger = screen.getByRole("button", { name: "Choose project" });
-  fireEvent.keyDown(trigger, { key: "A" });
-  fireEvent.keyDown(trigger, { key: "l" });
-  fireEvent.keyDown(trigger, { key: " " });
-  fireEvent.keyDown(trigger, { key: "W" });
-  fireEvent.keyDown(trigger, { key: "Backspace" });
-  fireEvent.keyDown(trigger, { key: "Backspace" });
-  expect(trigger.getAttribute("aria-expanded")).toBe("true");
-  act(() => vi.advanceTimersByTime(300));
-  act(() => vi.advanceTimersToNextFrame());
-  expect(document.activeElement).toBe(search());
-  expect((search() as HTMLInputElement).value).toBe("Al");
-  expect(screen.getByRole("option", { name: /Alpha Web/ })).toBeTruthy();
-  expect(screen.queryByRole("option", { name: /BB/ })).toBeNull();
-});
-
-it("cancels delayed opening on unmount", () => {
+it("cancels pending search focus on unmount", () => {
   vi.useFakeTimers();
   const { unmount } = render(<Flow />);
   unmount();
-  act(() => vi.advanceTimersByTime(1000));
+  act(() => vi.advanceTimersToNextFrame());
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it("skips the expansion motion when reduced motion is enabled", () => {
-  vi.useFakeTimers();
-  const matchMedia = window.matchMedia.bind(window);
-  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    ...matchMedia(query),
-    matches: query === "(prefers-reduced-motion: reduce)",
-  }));
-  render(<Flow />);
-  act(() => vi.advanceTimersByTime(500));
-  act(() => vi.advanceTimersByTime(0));
-  act(() => vi.advanceTimersToNextFrame());
-  expect(document.activeElement).toBe(search());
-});
-
-it("focuses search after the expanded panel becomes interactive", () => {
-  vi.useFakeTimers();
-  const focus = vi.spyOn(HTMLInputElement.prototype, "focus");
-  render(<Flow />);
-  act(() => vi.advanceTimersByTime(500));
-  act(() => vi.advanceTimersByTime(300));
-  expect(
-    search().closest("[data-project-picker-panel]")?.hasAttribute("inert"),
-  ).toBe(false);
-  expect(focus).not.toHaveBeenCalled();
-  act(() => vi.advanceTimersToNextFrame());
-  expect(document.activeElement).toBe(search());
-});
-
-it("focuses the open search when its pane becomes active and cancels stale focus", () => {
+it("focuses search when its pane becomes active and cancels stale focus", () => {
   vi.useFakeTimers();
   const { rerender } = render(<Flow autoFocus={false} />);
-  act(() => vi.advanceTimersByTime(500));
-  act(() => vi.advanceTimersByTime(300));
   act(() => vi.advanceTimersToNextFrame());
   expect(document.activeElement).not.toBe(search());
   rerender(<Flow autoFocus />);

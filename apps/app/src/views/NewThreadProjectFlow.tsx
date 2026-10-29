@@ -2,7 +2,6 @@ import {
   projectBadgeLabel,
   projectBadgeStyle,
 } from "@bb/shared-ui/project-identity";
-import { ProjectPickerDisclosure } from "./ProjectPickerDisclosure";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import { Button } from "@bb/shared-ui/button";
@@ -78,6 +77,14 @@ export function NewThreadProjectFlow({
     const frame = window.requestAnimationFrame(onCompose);
     return () => window.cancelAnimationFrame(frame);
   }, [choosing, onCompose]);
+
+  useEffect(() => {
+    if (!choosing || !autoFocus) return;
+    const frame = window.requestAnimationFrame(() =>
+      inputRef.current?.focus({ preventScroll: true }),
+    );
+    return () => window.cancelAnimationFrame(frame);
+  }, [choosing, autoFocus, loading, lastResetRequest]);
 
   const selectProject = async (nextProjectId: string) => {
     if (pendingRef.current || loading) return;
@@ -158,15 +165,7 @@ export function NewThreadProjectFlow({
               Choose a project, then start your thread.
             </p>
           </div>
-          <ProjectPickerDisclosure
-            key={lastResetRequest ?? "initial"}
-            label={selectedProject?.name ?? "Choose a project"}
-            autoFocus={autoFocus}
-            loading={loading}
-            inputRef={inputRef}
-            query={query}
-            onQueryChange={setQuery}
-          >
+          <div className="overflow-hidden rounded-2xl border border-border bg-popover shadow-sm transition-colors duration-300 focus-within:border-file-accent/50">
             <Command
               key={`${resetRequest ?? "project-picker"}-${loading ? "loading" : "ready"}`}
               label="Search projects"
@@ -295,7 +294,7 @@ export function NewThreadProjectFlow({
                 <kbd className="font-mono">Esc</kbd> to clear search
               </span>
             </div>
-          </ProjectPickerDisclosure>
+          </div>
           {pendingProjectId !== null ? (
             <p role="status" className="text-sm text-muted-foreground">
               Preparing your workspace…
