@@ -197,7 +197,7 @@ it("keeps the last project highlighted when project loading finishes", async () 
   );
   await openPicker();
   rerender(<Flow onSelectProject={select} />);
-  expect(document.activeElement).toBe(search());
+  await waitFor(() => expect(document.activeElement).toBe(search()));
   fireEvent.keyDown(search(), { key: "Enter" });
   await waitFor(() => expect(select).toHaveBeenCalledWith("bb"));
 });
@@ -214,6 +214,7 @@ it("waits half a second, animates open, then focuses search", () => {
   expect(trigger.getAttribute("aria-expanded")).toBe("true");
   expect(screen.queryByRole("combobox")).toBeNull();
   act(() => vi.advanceTimersByTime(300));
+  act(() => vi.advanceTimersToNextFrame());
   expect(document.activeElement).toBe(search());
 });
 
@@ -229,6 +230,7 @@ it("opens from the keyboard and keeps text typed during expansion", () => {
   fireEvent.keyDown(trigger, { key: "Backspace" });
   expect(trigger.getAttribute("aria-expanded")).toBe("true");
   act(() => vi.advanceTimersByTime(300));
+  act(() => vi.advanceTimersToNextFrame());
   expect(document.activeElement).toBe(search());
   expect((search() as HTMLInputElement).value).toBe("Al");
   expect(screen.getByRole("option", { name: /Alpha Web/ })).toBeTruthy();
@@ -253,5 +255,36 @@ it("skips the expansion motion when reduced motion is enabled", () => {
   render(<Flow />);
   act(() => vi.advanceTimersByTime(500));
   act(() => vi.advanceTimersByTime(0));
+  act(() => vi.advanceTimersToNextFrame());
+  expect(document.activeElement).toBe(search());
+});
+
+it("focuses search after the expanded panel becomes interactive", () => {
+  vi.useFakeTimers();
+  const focus = vi.spyOn(HTMLInputElement.prototype, "focus");
+  render(<Flow />);
+  act(() => vi.advanceTimersByTime(500));
+  act(() => vi.advanceTimersByTime(300));
+  expect(
+    search().closest("[data-project-picker-panel]")?.hasAttribute("inert"),
+  ).toBe(false);
+  expect(focus).not.toHaveBeenCalled();
+  act(() => vi.advanceTimersToNextFrame());
+  expect(document.activeElement).toBe(search());
+});
+
+it("focuses the open search when its pane becomes active and cancels stale focus", () => {
+  vi.useFakeTimers();
+  const { rerender } = render(<Flow autoFocus={false} />);
+  act(() => vi.advanceTimersByTime(500));
+  act(() => vi.advanceTimersByTime(300));
+  act(() => vi.advanceTimersToNextFrame());
+  expect(document.activeElement).not.toBe(search());
+  rerender(<Flow autoFocus />);
+  rerender(<Flow autoFocus={false} />);
+  act(() => vi.advanceTimersToNextFrame());
+  expect(document.activeElement).not.toBe(search());
+  rerender(<Flow autoFocus />);
+  act(() => vi.advanceTimersToNextFrame());
   expect(document.activeElement).toBe(search());
 });

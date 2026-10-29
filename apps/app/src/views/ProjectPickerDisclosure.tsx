@@ -47,8 +47,8 @@ export function ProjectPickerDisclosure({
   }, []);
 
   useEffect(() => {
-    if (autoFocus) triggerRef.current?.focus({ preventScroll: true });
-  }, [autoFocus]);
+    if (autoFocus && !ready) triggerRef.current?.focus({ preventScroll: true });
+  }, [autoFocus, ready]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -60,7 +60,11 @@ export function ProjectPickerDisclosure({
   }, [expanded]);
 
   useEffect(() => {
-    if (ready && autoFocus) inputRef.current?.focus({ preventScroll: true });
+    if (!ready || !autoFocus) return;
+    const frame = window.requestAnimationFrame(() =>
+      inputRef.current?.focus({ preventScroll: true }),
+    );
+    return () => window.cancelAnimationFrame(frame);
   }, [ready, autoFocus, loading, inputRef]);
 
   const expand = () => {
