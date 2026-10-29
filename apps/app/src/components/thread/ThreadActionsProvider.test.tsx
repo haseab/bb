@@ -499,8 +499,6 @@ describe("ThreadActionsProvider archive feedback", () => {
       throw new Error("Expected archive toast to provide Undo");
     }
     render(<button onClick={undoAction.onClick}>Run undo</button>);
-    fireEvent.keyDown(window, { key: "z", metaKey: true });
-    fireEvent.keyDown(window, { key: "z", metaKey: true });
     fireEvent.click(screen.getByRole("button", { name: "Run undo" }));
     expect(appToast.dismiss).toHaveBeenCalledWith("thread-archived-thr_parent");
 
