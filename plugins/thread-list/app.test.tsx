@@ -8,6 +8,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import {
@@ -168,6 +169,11 @@ describe("thread-list plugin", () => {
     renderList(
       {},
       {
+        sdk: {
+          threads: {
+            get: vi.fn(sdkResult(makeThreadResponse({ id: "thr_later" }))),
+          },
+        },
         rpc: {
           listPreferences: () => ({ preferences: defaultPreferences() }),
           setCompleted,
