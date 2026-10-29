@@ -1,11 +1,15 @@
 import {
+  useCallback,
   useLayoutEffect,
   useRef,
   useState,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import type { Action, ExternalToast } from "sonner";
+import { isMacKeyboardPlatform } from "@bb/domain";
+import { browserPlatform } from "@/lib/app-keybindings";
 import { Button } from "@bb/shared-ui/button";
 import { Icon, type IconName } from "@bb/shared-ui/icon";
 import { cn } from "@bb/shared-ui/lib/utils";
@@ -13,6 +17,10 @@ import {
   openNotificationCenter,
   recordNotification,
 } from "@/lib/notifications/notification-store";
+import {
+  registerToastShortcuts,
+  removeToastShortcuts,
+} from "./toast-shortcuts";
 import { withSonnerToast } from "./app-toast-runtime";
 
 export type AppToastTone =
@@ -75,6 +83,8 @@ interface AppToastActionButtonProps {
   action: Action;
   id?: number | string;
   priority: "primary" | "secondary";
+  onConfirm: () => void;
+  consumedRef: RefObject<boolean>;
 }
 
 type AppToastMethod = (
@@ -103,6 +113,7 @@ function dismissToast(id: number | string | undefined): void {
   if (id === undefined) {
     return;
   }
+  removeToastShortcuts(id);
   withSonnerToast((sonnerToast) => sonnerToast.dismiss(id));
 }
 
@@ -110,8 +121,27 @@ function AppToastActionButton({
   action,
   id,
   priority,
+  onConfirm,
+  consumedRef,
 }: AppToastActionButtonProps) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const isUndo = action.label === "Undo";
+  const isMac = isMacKeyboardPlatform(browserPlatform());
+  useLayoutEffect(() => {
+    consumedRef.current = false;
+    if (!isUndo) return;
+    return registerToastShortcuts({
+      id,
+      undo: () => buttonRef.current?.click(),
+      confirm: () => {
+        consumedRef.current = true;
+        onConfirm();
+      },
+    });
+  }, [action, id, isUndo, onConfirm, consumedRef]);
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (isUndo && consumedRef.current) return;
+    if (isUndo) consumedRef.current = true;
     action.onClick(event);
     if (priority === "primary" && event.defaultPrevented) {
       return;
@@ -121,13 +151,20 @@ function AppToastActionButton({
 
   return (
     <Button
+      ref={buttonRef}
       type="button"
       variant="link"
       size="sm"
       className="h-auto shrink-0 px-0 py-0 text-xs text-muted-foreground underline underline-offset-4"
       onClick={handleClick}
+      aria-keyshortcuts={isUndo ? `${isMac ? "Meta" : "Control"}+Z` : undefined}
     >
       {action.label}
+      {isUndo ? (
+        <span aria-hidden="true" className="ml-1 opacity-60">
+          {isMac ? "⌘Z" : "Ctrl+Z"}
+        </span>
+      ) : null}
     </Button>
   );
 }
@@ -198,6 +235,15 @@ export function AppToastContent({
   tone,
 }: AppToastContentProps) {
   const hasActions = action !== undefined || cancel !== undefined;
+  const canUndo = action?.label === "Undo" || cancel?.label === "Undo";
+  const consumedRef = useRef(false);
+  const isMac = isMacKeyboardPlatform(browserPlatform());
+  const confirm = useCallback(() => {
+    consumedRef.current = true;
+    removeToastShortcuts(id);
+    if (onDismiss) onDismiss();
+    else dismissToast(id);
+  }, [id, onDismiss]);
   const showNotification = () => {
     dismissToast(id);
     openNotificationCenter(notificationId);
@@ -205,10 +251,37 @@ export function AppToastContent({
   const actions = hasActions ? (
     <>
       {action ? (
-        <AppToastActionButton action={action} id={id} priority="primary" />
+        <AppToastActionButton
+          action={action}
+          id={id}
+          priority="primary"
+          onConfirm={confirm}
+          consumedRef={consumedRef}
+        />
       ) : null}
       {cancel ? (
-        <AppToastActionButton action={cancel} id={id} priority="secondary" />
+        <AppToastActionButton
+          action={cancel}
+          id={id}
+          priority="secondary"
+          onConfirm={confirm}
+          consumedRef={consumedRef}
+        />
+      ) : null}
+      {canUndo ? (
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto px-0 py-0 text-xs text-muted-foreground"
+          onClick={confirm}
+          aria-keyshortcuts={`${isMac ? "Meta" : "Control"}+Enter`}
+        >
+          Confirm{" "}
+          <span aria-hidden="true" className="ml-1 opacity-60">
+            {isMac ? "⌘↵" : "Ctrl+Enter"}
+          </span>
+        </Button>
       ) : null}
     </>
   ) : null;
@@ -257,7 +330,7 @@ export function AppToastContent({
             size="icon"
             className="-mr-1 -mt-1 size-6 shrink-0 text-muted-foreground"
             aria-label="Dismiss notification"
-            onClick={() => (onDismiss ? onDismiss() : dismissToast(id))}
+            onClick={confirm}
           >
             <Icon
               name="X"
@@ -322,6 +395,14 @@ function showAppToast({
         className: cn("bb-app-toast", className),
         dismissible,
         duration: nextDuration,
+        onDismiss: (value) => {
+          removeToastShortcuts(toastId);
+          sonnerOptions.onDismiss?.(value);
+        },
+        onAutoClose: (value) => {
+          removeToastShortcuts(toastId);
+          sonnerOptions.onAutoClose?.(value);
+        },
       },
     ),
   );
@@ -344,6 +425,7 @@ const showLoadingToast: AppToastMethod = (title, options) =>
   showAppToast({ options, title, tone: "loading" });
 
 function dismissAppToast(id?: number | string): void {
+  removeToastShortcuts(id);
   withSonnerToast((sonnerToast) => sonnerToast.dismiss(id));
 }
 

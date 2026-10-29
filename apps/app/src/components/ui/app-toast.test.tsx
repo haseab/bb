@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AppToastContent } from "./app-toast";
+import { AppToastContent, appToast } from "./app-toast";
 
 afterEach(() => {
   cleanup();
@@ -72,5 +72,105 @@ describe("AppToastContent", () => {
     screen.getByRole("button", { name: "Dismiss notification" }).click();
 
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Undo toast shortcuts", () => {
+  const key = (key: string, overrides = {}) =>
+    fireEvent.keyDown(window, { key, metaKey: true, ...overrides });
+
+  it("undoes the newest actionable toast once without informational toasts stealing it", () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    render(
+      <>
+        <AppToastContent
+          id="first"
+          title="Archived"
+          tone="success"
+          cancel={{ label: "Undo", onClick: first }}
+        />
+        <AppToastContent
+          id="second"
+          title="Completed"
+          tone="success"
+          cancel={{ label: "Undo", onClick: second }}
+        />
+        <AppToastContent id="info" title="Connected" tone="message" />
+      </>,
+    );
+    expect(key("z")).toBe(false);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    expect(key("z", { metaKey: false, ctrlKey: true })).toBe(false);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(key("z")).toBe(true);
+    fireEvent.click(screen.getAllByRole("button", { name: "Undo" })[1]!);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["keyboard", "button"])(
+    "confirms via %s and retires Undo before the toast exits",
+    (surface) => {
+      const undo = vi.fn();
+      const confirm = vi.fn();
+      render(
+        <AppToastContent
+          id="complete"
+          title="Completed"
+          tone="success"
+          cancel={{ label: "Undo", onClick: undo }}
+          onDismiss={confirm}
+        />,
+      );
+      if (surface === "keyboard") expect(key("Enter")).toBe(false);
+      else fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+      expect(confirm).toHaveBeenCalledOnce();
+      expect(key("z")).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(undo).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves text shortcuts after editing while the Undo button still works", () => {
+    const undo = vi.fn();
+    render(
+      <AppToastContent
+        id="complete"
+        title="Completed"
+        tone="success"
+        cancel={{ label: "Undo", onClick: undo }}
+      />,
+    );
+    for (const overrides of [
+      { shiftKey: true },
+      { repeat: true },
+      { altKey: true },
+      { metaKey: false },
+    ]) {
+      expect(key("z", overrides)).toBe(true);
+    }
+    fireEvent.input(window);
+    expect(key("z")).toBe(true);
+    expect(key("Enter")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(undo).toHaveBeenCalledOnce();
+  });
+
+  it("removes shortcuts on dismissal and unmount", () => {
+    const undo = vi.fn();
+    const view = render(
+      <AppToastContent
+        id="complete"
+        title="Completed"
+        tone="success"
+        cancel={{ label: "Undo", onClick: undo }}
+      />,
+    );
+    appToast.dismiss("complete");
+    expect(key("z")).toBe(true);
+    view.unmount();
+    expect(key("Enter")).toBe(true);
+    expect(undo).not.toHaveBeenCalled();
   });
 });

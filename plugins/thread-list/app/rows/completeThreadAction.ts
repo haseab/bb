@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   experimental_THREAD_ACTION_GROUPS,
   useRpc,
+  useSdk,
   type PluginThreadActionRegistration,
 } from "@get-bb/plugin-sdk/app";
 import type { threadListRpcContract } from "../../server.js";
@@ -19,11 +20,38 @@ export function useThreadCompletion() {
   const ready = usePreferencesReady();
   const sectionId = useAtomValue(sidebarCompletedSectionIdAtom);
   const rpc = useRpc<typeof threadListRpcContract>();
+  const sdk = useSdk();
   const setCompleted = useCallback(
     async (threadId: string, completed: boolean) => {
       captureThreadPipelinePositions();
       try {
+        const previous = await sdk.threads.get({ threadId });
         await rpc.call("setCompleted", { threadId, completed });
+        toast.success(completed ? "Thread completed" : "Thread reopened", {
+          id: `thread-completion-${threadId}`,
+          description:
+            previous.title ?? previous.titleFallback ?? "Untitled thread",
+          duration: 10_000,
+          cancel: {
+            label: "Undo",
+            onClick: () => {
+              captureThreadPipelinePositions();
+              void (async () => {
+                try {
+                  await sdk.threads.update({
+                    threadId,
+                    sectionId: previous.sectionId,
+                    parentThreadId: previous.parentThreadId,
+                  });
+                  if (previous.pinnedAt !== null)
+                    await sdk.threads.pin({ threadId });
+                } catch {
+                  toast.error("Failed to undo thread change.");
+                }
+              })();
+            },
+          },
+        });
       } catch (error) {
         toast.error(
           completed ? "Failed to complete thread." : "Failed to reopen thread.",
@@ -31,7 +59,7 @@ export function useThreadCompletion() {
         throw error;
       }
     },
-    [rpc],
+    [rpc, sdk],
   );
   return { ready, sectionId, setCompleted };
 }

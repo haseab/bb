@@ -1125,7 +1125,11 @@ row's Customize actions, or `bb thread-list prefs get|set|reset <key>`
 | `collapsed*`          | `[]`                              | Collapsed sections, projects, threads, environments, custom sections, and machines                                                          |
 
 Complete in a thread's menu moves it to Completed; Reopen returns it to the
-unsectioned queue. Command+Enter completes the focused sidebar thread
+unsectioned queue. Both show a ten-second Undo toast. Undo restores the previous
+section, parent, and pinned state. Action toasts with an Undo button share
+Command/Control+Z to undo the newest action and Command/Control+Enter to keep it
+and dismiss its toast. Typing returns these shortcuts to the editor; the toast
+buttons remain available. Command+Enter completes the focused sidebar thread
 (Control+Enter off macOS), rebindable as `plugin:thread-list/complete`.
 `bb thread-list complete <thread-id>` and `reopen <thread-id>` expose the same
 action, as does the plugin's `setCompleted` RPC with `{threadId, completed}`.

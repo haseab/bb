@@ -75,6 +75,33 @@ describe("toast history", () => {
       toast.dismiss();
     });
   });
+  it("gives plugin Undo toasts the shared keyboard undo and confirmation", async () => {
+    render(<AppToasterView />);
+    const toast = createPluginToast(sonnerToast);
+    const undo = vi.fn();
+    act(() => {
+      toast.success("Thread completed", {
+        id: "completion-one",
+        cancel: { label: "Undo", onClick: undo },
+        duration: 10_000,
+      });
+    });
+    await screen.findByText("Thread completed");
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(undo).toHaveBeenCalledOnce();
+    act(() => {
+      toast.success("Thread reopened", {
+        id: "completion-two",
+        cancel: { label: "Undo", onClick: undo },
+        duration: 10_000,
+      });
+    });
+    await screen.findByText("Thread reopened");
+    fireEvent.keyDown(window, { key: "Enter", metaKey: true });
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(undo).toHaveBeenCalledOnce();
+    act(() => toast.dismiss());
+  });
 });
 
 describe("truncated toast descriptions", () => {

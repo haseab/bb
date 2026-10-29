@@ -176,3 +176,10 @@ are rebindable through core Keyboard settings.
 Search results show a `bb` badge for BB-created threads and `Codex` for native Codex imports. Sidebar Codex icons are purple for BB-created threads and keep their normal color for native imports; their tooltip states the origin. Continuing an imported conversation in BB preserves its origin. Hiding provider icons also hides this sidebar cue.
 
 The SDK thread list and search responses expose `creationSource` (`bb` or `native`), also visible through `bb thread list --json`. Sidebar plugins receive `PluginSidebarThread.experimental_creationSource`; older hosts omit it.
+
+Completion and reopening show an Undo toast for ten seconds in the UI.
+Command/Control+Z reverses the most recent Undo toast, including completion
+and archive; Command/Control+Enter confirms it and dismisses the toast.
+Completion Undo restores the previous section, parent, and pinned state.
+After typing, these shortcuts belong to the editor again; Undo and Confirm
+remain clickable in the toast. CLI and RPC completion remain immediate.
