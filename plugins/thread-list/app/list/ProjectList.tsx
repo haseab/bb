@@ -1,3 +1,4 @@
+import { VisibleSidebarThreadsProvider } from "./VisibleSidebarThreads.js";
 import {
   ThreadListVisibility,
   ThreadListMore,
@@ -1846,7 +1847,10 @@ function ProjectListComponent({
           <TopLevelSidebarSection
             label={completedSection.name}
             sectionId={`section:${completedSection.id}`}
-            collapsedThreads={completedPartition.completed}
+            collapsedThreads={completedPartition.completed.filter(
+              (thread) =>
+                !pinnedSidebarState.effectivePinnedThreadIds.has(thread.id),
+            )}
             collapsedActivity={getCollapsedChildActivity(
               completedPartition.completed,
             )}
@@ -1915,11 +1919,16 @@ function ProjectListComponent({
     </SidebarHeaderActionsProvider>
   );
   return (
-    <SidebarProjectsContext.Provider value={projects}>
-      <SidebarProvidersContext.Provider value={providers}>
-        {content}
-      </SidebarProvidersContext.Provider>
-    </SidebarProjectsContext.Provider>
+    <VisibleSidebarThreadsProvider
+      threads={threads}
+      activeThreadId={activeThreadId}
+    >
+      <SidebarProjectsContext.Provider value={projects}>
+        <SidebarProvidersContext.Provider value={providers}>
+          {content}
+        </SidebarProvidersContext.Provider>
+      </SidebarProjectsContext.Provider>
+    </VisibleSidebarThreadsProvider>
   );
 }
 

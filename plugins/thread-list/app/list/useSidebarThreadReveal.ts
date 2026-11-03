@@ -297,7 +297,7 @@ function useSidebarThreadRevealCore({
     revealState.current = step.state;
     for (const threadId of step.revealIds) {
       const thread = threadById.get(threadId);
-      if (!thread || thread.isHidden) {
+      if (!thread || thread.isHidden || threadId === step.navigationRevealId) {
         continue;
       }
       const { threadIdsToExpand, environmentIdsToExpand, expansion } =

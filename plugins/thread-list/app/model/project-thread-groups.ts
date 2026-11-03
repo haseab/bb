@@ -660,6 +660,25 @@ export interface ProjectThreadItemRowCountContext {
   collapsedThreadIds: ReadonlySet<string>;
   collapsedEnvironmentIds: ReadonlySet<string>;
   collapsedSectionKeys: ReadonlySet<string>;
+  visibleThreads: readonly SidebarThread[];
+}
+
+function visiblePreviewThreads(
+  threads: readonly SidebarThread[],
+  context: ProjectThreadItemRowCountContext,
+) {
+  const ids = new Set(threads.map((thread) => thread.id));
+  return context.visibleThreads.filter((thread) => ids.has(thread.id));
+}
+
+function countVisiblePreviewRows(
+  threads: readonly SidebarThread[],
+  context: ProjectThreadItemRowCountContext,
+) {
+  const visible = visiblePreviewThreads(threads, context);
+  return visible.length === 0
+    ? 0
+    : visible.length + Number(visible.length < threads.length);
 }
 
 function countThreadNodeRows(
@@ -670,7 +689,13 @@ function countThreadNodeRows(
     node.children.length === 0 ||
     context.collapsedThreadIds.has(node.thread.id)
   ) {
-    return 1;
+    return (
+      1 +
+      countVisiblePreviewRows(
+        getProjectThreadItemDescendants(node.children),
+        context,
+      )
+    );
   }
   return node.children.reduce(
     (total, child) => total + countProjectThreadItemRows(child, context),
@@ -687,7 +712,13 @@ export function countProjectThreadItemRows(
       return countThreadNodeRows(item.node, context);
     case "environment":
       if (context.collapsedEnvironmentIds.has(item.group.environmentId)) {
-        return 1;
+        return (
+          1 +
+          countVisiblePreviewRows(
+            getProjectThreadItemDescendants([item]),
+            context,
+          )
+        );
       }
       return item.group.nodes.reduce(
         (total, node) => total + countThreadNodeRows(node, context),
@@ -695,7 +726,13 @@ export function countProjectThreadItemRows(
       );
     case "section":
       if (context.collapsedSectionKeys.has(item.group.key)) {
-        return 1;
+        return (
+          1 +
+          countVisiblePreviewRows(
+            getProjectThreadItemDescendants(item.group.items),
+            context,
+          )
+        );
       }
       return item.group.items.reduce(
         (total, child) => total + countProjectThreadItemRows(child, context),
@@ -749,6 +786,12 @@ function collectThreadNodeNavigationEntries(
     node.children.length === 0 ||
     context.collapsedThreadIds.has(node.thread.id)
   ) {
+    entries.push(
+      ...visiblePreviewThreads(
+        getProjectThreadItemDescendants(node.children),
+        context,
+      ).map((thread) => ({ threadId: thread.id, projectId: thread.projectId })),
+    );
     return;
   }
   for (const child of node.children) {
@@ -767,6 +810,15 @@ function collectProjectThreadItemNavigationEntriesInto(
       return;
     case "environment":
       if (context.collapsedEnvironmentIds.has(item.group.environmentId)) {
+        entries.push(
+          ...visiblePreviewThreads(
+            getProjectThreadItemDescendants([item]),
+            context,
+          ).map((thread) => ({
+            threadId: thread.id,
+            projectId: thread.projectId,
+          })),
+        );
         return;
       }
       for (const node of item.group.nodes) {
@@ -775,6 +827,15 @@ function collectProjectThreadItemNavigationEntriesInto(
       return;
     case "section":
       if (context.collapsedSectionKeys.has(item.group.key)) {
+        entries.push(
+          ...visiblePreviewThreads(
+            getProjectThreadItemDescendants(item.group.items),
+            context,
+          ).map((thread) => ({
+            threadId: thread.id,
+            projectId: thread.projectId,
+          })),
+        );
         return;
       }
       for (const child of item.group.items) {
