@@ -171,6 +171,15 @@ the focused row, so Option+Up/Down reorders the selector's thread. Returning
 from chat restores the last sidebar selection. Focus shortcuts and archive
 are rebindable through core Keyboard settings.
 
+## Visible threads
+
+Threads visible in the current window, including split panes, remain visible and
+accented in the sidebar. Collapsed groups show only those threads followed by
+Show all when other threads remain hidden. This also applies to Completed and
+groups hidden under More. Opening a thread does not change saved collapse or
+hidden-group preferences. Show all expands or restores its group using the same
+preferences exposed by `bb thread-list prefs` and the `setPreference` RPC.
+
 ## Thread origin
 
 Search results show a `bb` badge for BB-created threads and `Codex` for native Codex imports. Sidebar Codex icons are purple for BB-created threads and keep their normal color for native imports; their tooltip states the origin. Continuing an imported conversation in BB preserves its origin. Hiding provider icons also hides this sidebar cue.

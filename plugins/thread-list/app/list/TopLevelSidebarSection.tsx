@@ -11,10 +11,7 @@ import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import { LIST_HOVER_TRANSITION } from "@/components/ui/motion";
 import { CHROME_SECTION_LABEL_CLASS } from "@/components/ui/chrome-style-tokens";
-import {
-  SidebarStickyGroup,
-  SidebarStickyTier,
-} from "../ui/sidebar.js";
+import { SidebarStickyGroup, SidebarStickyTier } from "../ui/sidebar.js";
 import {
   SIDEBAR_HOVER_ACTIONS_CLASS,
   SIDEBAR_HOVER_ACTIONS_FADE_CLASS,
@@ -45,6 +42,11 @@ import {
 import { SplitPaneMiniMap } from "@/components/ui/split-pane-mini-map";
 import { COARSE_POINTER_ROW_ACTION_SIZE_CLASS } from "@/components/ui/coarse-pointer-sizing";
 import { usePluginThreadRowStatusForThreads } from "./groupRollups.js";
+
+import {
+  VisibleSidebarThreads,
+  useVisibleSidebarThreads,
+} from "./VisibleSidebarThreads.js";
 
 const EMPTY_SPLIT_INDICATOR_THREADS: readonly ThreadSplitIndicatorTarget[] = [];
 
@@ -102,6 +104,9 @@ export function TopLevelSidebarSection({
   consumeClickSuppression,
   isDropTargetActive = false,
 }: TopLevelSidebarSectionProps) {
+  const visibleThreads = useVisibleSidebarThreads(collapsedThreads);
+  const hasVisiblePreview =
+    collapseControl?.isCollapsed === true && visibleThreads.length > 0;
   const threadDropState = useSectionDropTargetState(dropParentKey);
   const collapsedSplitIndicator = useThreadGroupSplitIndicator(
     collapsedThreads,
@@ -228,7 +233,7 @@ export function TopLevelSidebarSection({
               type="button"
               disabled={Boolean(labelEditor)}
               data-sidebar-rename-anchor=""
-              aria-expanded={!collapseControl.isCollapsed}
+              aria-expanded={!collapseControl.isCollapsed || hasVisiblePreview}
               data-sidebar-hover-actions-mobile={
                 SIDEBAR_HOVER_ACTIONS_MOBILE_ALWAYS_VALUE
               }
@@ -252,7 +257,8 @@ export function TopLevelSidebarSection({
                 name="ChevronRight"
                 className={cn(
                   "size-3 transition-transform duration-150",
-                  !collapseControl.isCollapsed && "rotate-90",
+                  (!collapseControl.isCollapsed || hasVisiblePreview) &&
+                    "rotate-90",
                 )}
                 aria-hidden="true"
               />
@@ -285,8 +291,7 @@ export function TopLevelSidebarSection({
                   "inline-flex shrink-0 items-center",
                   SIDEBAR_HOVER_ACTIONS_GAP_CLASS,
                   !actionsAlwaysVisible && SIDEBAR_HOVER_ACTIONS_CLASS,
-                  collapseControl?.isCollapsed &&
-                    "[@media(hover:none)]:hidden",
+                  collapseControl?.isCollapsed && "[@media(hover:none)]:hidden",
                 )}
               >
                 {actions}
@@ -295,7 +300,13 @@ export function TopLevelSidebarSection({
           </span>
         ) : null}
       </SidebarStickyTier>
-      {collapseControl?.isCollapsed || children == null ? null : (
+      {collapseControl?.isCollapsed ? (
+        <VisibleSidebarThreads
+          threads={collapsedThreads}
+          label={label}
+          onShowAll={collapseControl.onToggleCollapsed}
+        />
+      ) : children == null ? null : (
         <div className="mt-1">{children}</div>
       )}
     </SidebarStickyGroup>
