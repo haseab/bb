@@ -67,7 +67,7 @@ export function BacklogTriage() {
   const compact = useIsCompactViewport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useAtom(backlogStateAtom);
-  const { projects } = useSidebarData();
+  const { projects, status } = useSidebarData();
   const manualOrder = useAtomValue(sidebarManualThreadOrderAtom);
   const threads = useMemo(
     () => projects.flatMap((project) => project.threads),
@@ -224,6 +224,34 @@ export function BacklogTriage() {
         if (!saving) setOpen(value);
       }}
     >
+      {status === "ready" && untriaged.length > 0 && (
+        <div className="mx-2 mb-2 mt-1">
+          <button
+            type="button"
+            data-backlog-triage-banner=""
+            aria-label={`Triage ${untriaged.length} Backlog ${untriaged.length === 1 ? "thread" : "threads"}`}
+            disabled={open}
+            onClick={() => start()}
+            className="flex w-full items-center gap-3 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2.5 text-left text-sidebar-foreground transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+          >
+            <Icon name="Clock" className="size-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-medium">
+                Backlog to triage
+              </span>
+              <span className="block text-2xs text-muted-foreground">
+                {untriaged.length}{" "}
+                {untriaged.length === 1 ? "thread needs" : "threads need"} a
+                follow-up date
+              </span>
+            </span>
+            <Icon
+              name="ChevronRight"
+              className="size-4 shrink-0 text-muted-foreground"
+            />
+          </button>
+        </div>
+      )}
       {open &&
         !compact &&
         createPortal(

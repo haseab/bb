@@ -198,6 +198,11 @@ starts an implicit seven-day countdown (`backlogRefreshDays`, default `7`, range
 observes them. Children stay with their root. Pinned, archived, deleted, and
 manually moved threads are not pulled back by an old deadline.
 
+The sidebar shows a Backlog to triage banner below New thread and above the
+thread groups while Backlog roots need a follow-up date. Its count uses the same
+eligible threads as triage, updates as dates and placement change, and disappears
+when none remain. Click the banner to start triage.
+
 Command+E (Control+E elsewhere), command `plugin:thread-list/triage-backlog`, walks
 through Backlog roots that have no explicit follow-up date. It never includes
 Queued or Active threads, or threads already given a date. Type `7d`, `7 days`,

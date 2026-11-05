@@ -154,14 +154,14 @@ describe("Backlog follow-up triage", () => {
     expect(screen.getByText("Untriaged")).not.toBeNull();
   });
 
-  it("opens only untriaged Backlog threads, previews dates, saves, and advances", async () => {
+  it("opens untriaged Backlog threads from the banner and hides it after scheduling", async () => {
     const view = setup();
-    await waitFor(() =>
-      expect(backlogTriageCommand.isAvailable?.(context)).toBe(true),
-    );
-    act(() => {
-      backlogTriageCommand.run(context);
+    const banner = await screen.findByRole("button", {
+      name: "Triage 1 Backlog thread",
     });
+    expect(banner.textContent).toContain("1 thread needs a follow-up date");
+    fireEvent.click(banner);
+    expect(banner.hasAttribute("disabled")).toBe(true);
     expect(screen.getByTestId("app-root").hasAttribute("inert")).toBe(false);
     const input = await screen.findByRole("textbox", { name: "Follow up" });
     expect(screen.getByText("Untriaged")).not.toBeNull();
@@ -188,6 +188,31 @@ describe("Backlog follow-up triage", () => {
     await screen.findByText(
       "No Backlog threads left to triage. Scheduled threads keep their follow-up dates.",
     );
+    expect(
+      screen.queryByRole("button", { name: "Triage 1 Backlog thread" }),
+    ).toBeNull();
+  });
+  it("updates the banner as follow-up dates and backlog stages change", async () => {
+    const view = setup();
+    act(() => {
+      view.store.set(backlogStateAtom, (state) => ({
+        ...state,
+        items: state.items.map((item) => ({ ...item, followUpAt: null })),
+      }));
+    });
+    const banner = await screen.findByRole("button", {
+      name: "Triage 2 Backlog threads",
+    });
+    expect(banner.textContent).toContain("2 threads need a follow-up date");
+    act(() => {
+      view.store.set(backlogStateAtom, (state) => ({
+        ...state,
+        items: state.items.map((item) => ({ ...item, stage: "refreshing" })),
+      }));
+    });
+    expect(
+      screen.queryByRole("button", { name: /Triage \d+ Backlog/ }),
+    ).toBeNull();
   });
   it("keeps the mobile drawer deferred and leaves the app root accessible", async () => {
     setup(false, true);
