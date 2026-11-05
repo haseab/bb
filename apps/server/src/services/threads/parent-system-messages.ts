@@ -1,3 +1,4 @@
+import { restartAdmissionGate } from "../system/local-restart.js";
 import {
   getLatestThreadSequence,
   getEnvironment,
@@ -429,9 +430,19 @@ async function queueReadyParentSystemMessage(
   return true;
 }
 
-export async function queueParentSystemMessage(
+export function queueParentSystemMessage(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: QueueParentSystemMessageArgs,
+): Promise<boolean> {
+  return restartAdmissionGate(deps.db).run((allowed) =>
+    queueAdmittedParentSystemMessage(deps, args, allowed),
+  );
+}
+
+async function queueAdmittedParentSystemMessage(
+  deps: LoggedPendingInteractionWorkSessionDeps,
+  args: QueueParentSystemMessageArgs,
+  allowed: boolean,
 ): Promise<boolean> {
   const parentThread = getThread(deps.db, args.parentThreadId);
   if (
@@ -446,7 +457,7 @@ export async function queueParentSystemMessage(
       parentThread.id,
     );
   let hostUnavailable = false;
-  if (!hasPendingInteraction) {
+  if (!hasPendingInteraction && allowed) {
     try {
       return await deliverParentSystemMessage(deps, {
         input: args.input,
@@ -491,9 +502,11 @@ export async function queueParentSystemMessage(
     reasoningLevel: execution.reasoningLevel,
     permissionMode: execution.permissionMode,
     serviceTier: execution.serviceTier,
-    waitingOn: host
-      ? { kind: "host-offline", hostName: host.name }
-      : { kind: hasPendingInteraction ? "interaction" : "thread-busy" },
+    waitingOn: !allowed
+      ? { kind: "restart" }
+      : host
+        ? { kind: "host-offline", hostName: host.name }
+        : { kind: hasPendingInteraction ? "interaction" : "thread-busy" },
     sendAt: null,
     payload: { kind: "inline" },
     systemNotice: {
@@ -501,7 +514,7 @@ export async function queueParentSystemMessage(
       subject: args.systemMessageSubject,
     },
   });
-  if (!hasPendingInteraction && !hostUnavailable) {
+  if (!hasPendingInteraction && !hostUnavailable && allowed) {
     requestQueuedMessageDispatch(deps, {
       kind: "thread-ready",
       threadId: parentThread.id,
@@ -527,9 +540,12 @@ export async function deliverParentSystemMessage(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: DeliverParentSystemMessageArgs,
 ): Promise<boolean> {
-  return withThreadSendGuard(args.parentThread.id, () =>
-    deliverParentSystemMessageWithContextGuard(deps, args),
-  );
+  return restartAdmissionGate(deps.db).run(async (allowed) => {
+    if (!allowed) return false;
+    return withThreadSendGuard(args.parentThread.id, () =>
+      deliverParentSystemMessageWithContextGuard(deps, args),
+    );
+  });
 }
 
 async function deliverParentSystemMessageWithContextGuard(

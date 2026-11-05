@@ -367,6 +367,8 @@ type ExpectedProvidersKey = "catalog" | "list" | "models" | "setEnabled";
 type ExpectedStatusKey = "get";
 
 type ExpectedSystemKey =
+  | "localRestart"
+  | "controlLocalRestart"
   | "acknowledgeAppUpdate"
   | "mobileAppDownloads"
   | "mobileAppReleases"

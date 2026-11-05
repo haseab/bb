@@ -41,6 +41,15 @@ function describeWait(
 }
 
 describe("describeQueuedMessageWait", () => {
+  it("explains the restart hold and prevents bypass", () => {
+    expect(describeWait({ kind: "restart" })).toBe("Sending after BB restarts");
+    expect(
+      isQueuedMessageSendNowAllowed({
+        waitingOn: { kind: "restart" },
+        failureReason: null,
+      }),
+    ).toBe(false);
+  });
   it("leaves an ordinary queued message unexplained", () => {
     expect(describeWait({ kind: "thread-busy" })).toBeNull();
     expect(describeWait(null)).toBeNull();

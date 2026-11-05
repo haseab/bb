@@ -1,3 +1,7 @@
+import {
+  localRestartStatus,
+  controlLocalRestart,
+} from "../services/system/local-restart.js";
 import { readLocalBuildVersion } from "../services/system/local-build-version.js";
 import { createMobileAppReleaseService } from "../services/install/mobile-app-releases.js";
 import {
@@ -706,6 +710,16 @@ export function registerSystemRoutes(
       ...version,
       localBuildVersion: await readLocalBuildVersion(frontendDir),
     });
+  });
+
+  get(routes.localRestart, async (context) =>
+    context.json(await localRestartStatus(deps.db, deps.config.dataDir)),
+  );
+  post(routes.controlLocalRestart, async (context, body) => {
+    assertAppUpdateAllowed(context);
+    return context.json(
+      await controlLocalRestart(deps.db, deps.config.dataDir, body),
+    );
   });
 
   get(routes.appUpdate, async (context, query) =>

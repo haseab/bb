@@ -1018,3 +1018,35 @@ the cached work. Daemons older than this field report `true`.
 ## In-memory Backlog preview
 
 Open the source dev frontend with `?preview=backlog` to preview Thread List using actual dev conversations. Badge-preview fixtures are hidden. Several real threads are placed into Completed, Active, Backlog, and the refreshed queue in browser memory. Follow-up triage, completion, pinning, archiving, and section moves stay in that tab. API writes outside these supported previews are blocked, including starting runs. Browser storage writes and the persisted sidebar snapshot are disabled. Refresh discards changes; removing the query parameter returns to normal dev behavior. This mode is unavailable in packaged builds and does not alter other tabs or the server database.
+
+## Safe local desktop restart
+
+From the normal BB checkout, `pnpm desktop:restart` starts the detached
+`apps/desktop/scripts/restart-local.mjs` coordinator. It builds with
+`pnpm desktop:package` before touching the running app. The artifact stays at
+`apps/desktop/release/mac-arm64/bb.app`; installation stays at
+`/Applications/bb.app` and uses existing `~/.bb` data.
+
+Inspect `pnpm desktop:restart status`, cancel with `pnpm desktop:restart cancel`,
+or explicitly permit interruption with `pnpm desktop:restart now`. The equivalent
+CLI is `bb restart start --checkout <normal-checkout>`, with status/cancel/now
+subcommands. These commands do not use the generic app auto-updater.
+
+The worker logs to `~/.bb/restart/build.log` and atomically records its job in
+`~/.bb/restart/state.json`. `command.json` records explicit cancel/now requests;
+`lock/` prevents simultaneous coordinators. A Node.js 24+ executable outside the
+installed app keeps the worker alive across replacement. Staging and rollback
+use `/Applications/.bb-install-staging.app` and `/Applications/.bb-previous.app`;
+an existing previous-app backup blocks another install pending recovery.
+
+Once the build is verified, server admission holds new sends as durable queued
+messages. Already admitted operations finish before the idle commit. The new
+server recovers the hold before startup queue dispatch; queued work stays held
+through executable/runtime/frontend verification. Failure restores the previous
+app. A lost worker's admission lease expires after two minutes.
+
+An installed runtime predating this feature returns no admission endpoint. The
+worker remains blocked with the app running; use cancel, or explicitly choose
+now only when interruption is acceptable for the first upgrade. It never treats
+missing admission support as proof of idle. During ordinary development, run
+relevant tests and typechecks without invoking this coordinator.

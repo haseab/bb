@@ -1408,3 +1408,18 @@ machine names, supports adding further folders and detaching existing ones,
 and can save a new project name. Folder changes save immediately; detaching a
 folder keeps files and threads. The same source management remains available
 in Settings → Projects → Folders and through `bb project source add|delete`.
+
+### Local source desktop restart state
+
+The macOS source coordinator (`pnpm desktop:restart`, or `bb restart start
+--checkout <path>`) keeps job metadata in `~/.bb/restart/state.json`, its build
+log in `~/.bb/restart/build.log`, explicit cancellation/force requests in
+`command.json`, and a single-worker `lock/` directory. These are coordinator
+state, not settings to edit by hand. The installed app remains open during
+packaging; new sends queue once the verified build is waiting for idle. A
+renewable two-minute admission lease prevents a dead coordinator from holding
+dispatch forever. Use the status/cancel/now commands or the app's pending-restart
+controls. This is separate from release auto-updates and uses `/Applications/bb.app`
+with the existing `~/.bb` data; rollback replaces the application bundle, not the
+database. See `docs/debugging-and-qa.md` for recovery paths and first-upgrade
+behavior when the installed runtime has no admission endpoint.

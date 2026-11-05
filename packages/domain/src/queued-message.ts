@@ -52,6 +52,7 @@ import {
  *   is not derivable from the kind (plus `sendAt`) by the renderer.
  */
 export const queuedMessageWaitingOnKindValues = [
+  "restart",
   "time",
   "thread-busy",
   "stopping",
@@ -86,6 +87,7 @@ export const queuedMessageWaitReasonSchema = z
   .max(QUEUED_MESSAGE_WAIT_REASON_MAX_LENGTH);
 
 export const queuedMessageWaitingOnSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("restart") }),
   z.object({ kind: z.literal("time") }),
   z.object({ kind: z.literal("thread-busy") }),
   z.object({ kind: z.literal("stopping") }),

@@ -8,6 +8,7 @@ import { registerProviderCommands } from "../commands/provider.js";
 import { registerMachineCommands } from "../commands/machine.js";
 import { registerServerCommands } from "../commands/server.js";
 import { registerThreadCommands } from "../commands/thread/index.js";
+import { registerRestartCommand } from "../commands/restart.js";
 const EXCLUDED_COMMANDS = new Set<string>();
 
 function collectLeafCommands(
@@ -33,6 +34,7 @@ describe("CLI --json flag enforcement", () => {
     const getUrl = () => "http://localhost";
 
     registerStatusCommand(program, getUrl);
+    registerRestartCommand(program, getUrl);
     registerProjectCommands(program, getUrl);
     registerPromptHistoryCommands(program, getUrl);
     registerProviderCommands(program, getUrl);
