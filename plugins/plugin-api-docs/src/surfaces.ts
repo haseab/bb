@@ -134,9 +134,9 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "Replace the sidebar's thread list with one your plugin renders. With this, a plugin can:",
         bullets: [
           "Group, sort, and draw every row your own way",
-          "Read live threads, sections, projects, and run status",
+          "Read live threads, projects, and status while keeping bb's search, footer, and New thread button",
           "Use optimistic SDK writes and bb's actions to move, pin, rename, restore, archive, and split threads",
-          "Keep bb's New thread button, search, and footer around it",
+          "Open bb's project editor to inspect, attach, or detach source folders from a conversation",
         ],
         apiSymbols: [
           "PluginThreadListRegistration",
@@ -149,6 +149,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "PluginSidebarThread.experimental_creationSource",
           "PluginSidebarSection",
           "experimental_useArchiveEnvironmentThreads",
+          "experimental_useProjectEditor",
           "BbNavigate.toThread",
           "BbNavigate.toCompose",
           "experimental_useSidebarThreadSplit",
@@ -1631,6 +1632,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "createFakePluginHost",
           "renderSlot",
           "RenderedSlotInspectionState.experimental_pageTitle",
+          "RenderedSlotInspectionState.experimental_projectEditorCalls",
           "createFakeSdk",
           "experimental_createHostEntryHarness",
           "loadPluginApp",

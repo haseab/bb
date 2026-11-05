@@ -237,7 +237,9 @@ export default async function threadListPlugin(bb: BbPluginApi) {
         const thread = await bb.sdk.threads.get({ threadId: eventThread.id });
         if (
           thread.status !== "active" ||
-          thread.sectionId !== null ||
+          (thread.sectionId !== null &&
+            thread.sectionId !== preferences.completedSectionId) ||
+          thread.sectionId === sectionId ||
           thread.parentThreadId !== null ||
           thread.pinnedAt !== null ||
           thread.archivedAt !== null ||
@@ -259,7 +261,7 @@ export default async function threadListPlugin(bb: BbPluginApi) {
       })
       .catch((error: unknown) => {
         bb.log.warn(
-          `could not move a running queued thread to Active: ${error instanceof Error ? error.message : String(error)}`,
+          `could not move a running queued or completed thread to Active: ${error instanceof Error ? error.message : String(error)}`,
         );
       });
     return sectionTransition;

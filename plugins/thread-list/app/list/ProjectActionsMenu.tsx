@@ -1,3 +1,4 @@
+import { experimental_useProjectEditor } from "@get-bb/plugin-sdk/app";
 import type { MouseEvent, ReactNode } from "react";
 import {
   ContextMenu,
@@ -5,7 +6,10 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
-import { ActionMenuItem, ActionMenuSeparator } from "@/components/ui/action-menu-items";
+import {
+  ActionMenuItem,
+  ActionMenuSeparator,
+} from "@/components/ui/action-menu-items";
 import { CompactLongPressMenu } from "@/components/ui/compact-long-press-menu";
 import type { SidebarProject } from "../model/use-sidebar-data.js";
 
@@ -40,9 +44,21 @@ export function ProjectActionsMenuItems({
   onRemove,
   extraActions,
 }: ProjectActionsMenuItemsProps) {
+  const editProject = experimental_useProjectEditor();
   return (
     <>
-      <ActionMenuItem surface={surface} icon="Settings" href={project.settingsHref}>
+      <ActionMenuItem
+        surface={surface}
+        icon="Folder"
+        onSelect={() => editProject(project.id)}
+      >
+        Edit project…
+      </ActionMenuItem>
+      <ActionMenuItem
+        surface={surface}
+        icon="Settings"
+        href={project.settingsHref}
+      >
         Project settings
       </ActionMenuItem>
       <ActionMenuItem surface={surface} icon="Edit" onSelect={onRename}>

@@ -13,6 +13,13 @@ The command is `plugin:thread-list/complete` and can be rebound in Settings →
 Keyboard. It only acts on the focused sidebar row, leaving composer submission
 unchanged. Completed rows offer Reopen to return to the unsectioned queue.
 The default row quick action is Complete; Archive remains a separate menu action.
+Completing a sidebar thread opens the next visible thread below it, skipping
+children that move with the completed parent and threads already in Completed.
+At the bottom it opens the previous remaining thread, or the new-thread screen
+when none remain. Reopen does not change the current chat. Navigation happens
+after completion succeeds; Undo restores placement without switching chats.
+When completion started from the focused sidebar selector (including
+Command/Control+Enter), Undo also returns that selector to the restored thread.
 
 ```sh
 bb thread-list complete <thread-id> [--json]
@@ -147,16 +154,18 @@ The command palette exposes the same operations. API clients can use
 `threads.update({threadId, sectionId})`, `threadSections`, and the thread-list
 `setPreference` RPC for the same section and manual-order state.
 
-Set `autoActiveSectionId` to the Active section id to move a queued root thread
+Set `autoActiveSectionId` to the Active section id to move a queued or completed root thread
 to that section when it starts running:
 `bb thread-list prefs set autoActiveSectionId <active-section-id>`.
 The default is `null` (disabled). The backend rechecks current placement and only
-promotes unsectioned, unpinned, unarchived root threads. It prepends the thread to
+promotes unsectioned root threads or roots in the configured Completed section,
+provided they are unpinned and unarchived. It prepends the thread to
 manual order, selects Manual sorting, and disables read-status grouping so the
 newly active thread appears at the top. When a thread in that Active section becomes
 idle, it returns to the top of the unsectioned queue, selecting Manual sorting
 and disabling read-status grouping so it stays first. Threads
-in Completed or another section stay there, including after another run. The
+restarted from Completed follow the same Active → Queued path. Threads in other
+custom sections stay there, including after another run. The
 backend rereads current status and placement before moving a thread, so stale
 finish events do not move a newly running thread or override a manual move.
 Deleted destinations are ignored. Reset the preference

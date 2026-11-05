@@ -40,7 +40,6 @@ export function promptEditorExtensions({
   return [
     Bold,
     Italic,
-    Code,
     CodeBlock,
     Heading,
     HorizontalRule,
@@ -51,6 +50,7 @@ export function promptEditorExtensions({
       shouldAutoLink: () => false,
     }),
     Strike,
+    Code.extend({ excludes: "" }),
     BulletList,
     OrderedList,
     ListItem,

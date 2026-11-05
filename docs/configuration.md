@@ -1379,3 +1379,10 @@ and workspace access. They follow each folder's local instructions when working
 there. Project-default threads use a managed directory when the selected machine
 has zero or multiple folders; a single folder retains the checkout/worktree default.
 Choose Project workspace explicitly to use a managed directory with any folder count.
+
+Project and thread context menus expose **Edit project…** to inspect attached
+folders without leaving the conversation. The editor shows full paths and
+machine names, supports adding further folders and detaching existing ones,
+and can save a new project name. Folder changes save immediately; detaching a
+folder keeps files and threads. The same source management remains available
+in Settings → Projects → Folders and through `bb project source add|delete`.

@@ -5168,6 +5168,8 @@ export interface PluginSdkApp {
     /** Defaults to active threads only. An empty selection also means active. */
     experimental_lifecycles: readonly ("active" | "archived")[];
   }): PluginSidebarThreadsState;
+  /** Open the host's project editor to inspect, attach or detach folders and rename a standard project. Personal is ignored. Core project and thread menus use the same editor. */
+  experimental_useProjectEditor(): (projectId: string) => void;
   /**
    * Thread actions bound to the host's mutations (see
    * {@link PluginSidebarThreadActions}). Experimental: see

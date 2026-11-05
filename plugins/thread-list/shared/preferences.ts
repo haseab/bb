@@ -134,7 +134,7 @@ export const preferenceDefinitions = {
   autoActiveSectionId: definePreference(
     listItemSchema.nullable(),
     null,
-    "Move unsectioned queued root threads to this section when they become active, at the top of manual order, and return idle threads in this section to the queue. Other sections are preserved. null disables this rule.",
+    "Move unsectioned queued and completed root threads to this section when they become active, at the top of manual order, and return idle threads in this section to the queue. Other sections are preserved. null disables this rule.",
     null,
   ),
   manualThreadOrder: definePreference(

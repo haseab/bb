@@ -15,9 +15,9 @@ function rows(): Map<string, HTMLElement> {
   return result;
 }
 
-export function captureThreadPipelinePositions(): void {
+export function captureThreadPipelinePositions(restoreFocus = true): void {
   focusedLink =
-    document.activeElement instanceof HTMLElement
+    restoreFocus && document.activeElement instanceof HTMLElement
       ? document.activeElement.closest<HTMLElement>("[data-sidebar-thread-id]")
       : null;
   focusedThreadId = focusedLink?.dataset.sidebarThreadId ?? null;

@@ -423,6 +423,116 @@ describe("ThreadActionsProvider archive confirmation", () => {
   });
 });
 
+describe("ThreadActionsProvider archive navigation", () => {
+  it.each(["next", "previous", "windowed", "failed"] as const)(
+    "opens the next surviving sidebar row after archive succeeds: %s",
+    async (mode) => {
+      mocks.confirmThreadArchive = false;
+      const thread = makeThread();
+      mocks.viewedThreadId = thread.id;
+      mocks.pathname = `/projects/${thread.projectId}/threads/${thread.id}`;
+      let resolveArchive:
+        | ((response: { ok: true; archivedThreadIds: string[] }) => void)
+        | undefined;
+      let rejectArchive: ((error: Error) => void) | undefined;
+      vi.mocked(sdk.threads.archiveAll).mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            resolveArchive = resolve;
+            rejectArchive = reject;
+          }),
+      );
+      renderProvider(
+        <>
+          <div data-sidebar="content">
+            <a
+              href="/projects/previous/threads/before"
+              data-sidebar-thread-id="before"
+              data-sidebar-thread-shortcut-target=""
+            >
+              Before
+            </a>
+            <a
+              href={mocks.pathname}
+              data-sidebar-thread-id={thread.id}
+              data-sidebar-thread-shortcut-target=""
+            >
+              Current
+            </a>
+            <a
+              href="/projects/child/threads/thr_child"
+              data-sidebar-thread-id="thr_child"
+              data-sidebar-thread-shortcut-target=""
+            >
+              Child
+            </a>
+            {mode === "windowed" ? (
+              <div data-sidebar-windowed-nav="after:next" />
+            ) : (
+              mode !== "previous" && (
+                <a
+                  href="/projects/next/threads/after"
+                  data-sidebar-thread-id="after"
+                  data-sidebar-thread-shortcut-target=""
+                >
+                  After
+                </a>
+              )
+            )}
+          </div>
+          <ArchiveButton thread={thread} />
+        </>,
+      );
+      for (const element of document.querySelectorAll(
+        "[data-sidebar-thread-shortcut-target], [data-sidebar-windowed-nav]",
+      )) {
+        Object.defineProperty(element, "checkVisibility", {
+          value: () => true,
+        });
+      }
+      fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+      await vi.waitFor(() =>
+        expect(sdk.threads.archiveAll).toHaveBeenCalledOnce(),
+      );
+      expect(mocks.navigate).not.toHaveBeenCalled();
+      screen.getByRole("link", { name: "Current" }).remove();
+      if (mode === "failed") rejectArchive?.(new Error("offline"));
+      else
+        resolveArchive?.({
+          ok: true,
+          archivedThreadIds: ["thr_child", thread.id],
+        });
+      await vi.waitFor(() =>
+        expect(
+          mode === "failed" ? appToast.error : appToast.success,
+        ).toHaveBeenCalledOnce(),
+      );
+      if (mode === "failed") {
+        expect(mocks.navigate).not.toHaveBeenCalled();
+        return;
+      }
+      const destination =
+        mode === "previous"
+          ? "/projects/previous/threads/before"
+          : "/projects/next/threads/after";
+      expect(mocks.navigate).toHaveBeenCalledExactlyOnceWith(destination);
+      if (mode !== "windowed")
+        expect(document.activeElement).toBe(
+          screen.getByRole("link", {
+            name: mode === "previous" ? "Before" : "After",
+          }),
+        );
+      const undo = vi.mocked(appToast.success).mock.calls[0]?.[1]?.cancel;
+      if (!undo) throw new Error("Expected archive Undo");
+      render(<button onClick={undo.onClick}>Undo next-thread archive</button>);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Undo next-thread archive" }),
+      );
+      expect(mocks.navigate).toHaveBeenLastCalledWith(mocks.pathname);
+    },
+  );
+});
+
 describe("ThreadActionsProvider archive feedback", () => {
   it("offers the shared Undo toast for a group and restores its parent before descendants", async () => {
     vi.mocked(sdk.environments.archiveThreads).mockResolvedValue({

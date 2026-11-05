@@ -377,7 +377,7 @@ it("validates lifecycle selection through CLI and RPC and broadcasts it", async 
   });
 });
 
-describe("queued thread promotion", () => {
+describe("queued and completed thread promotion", () => {
   async function promotionHost() {
     const host = setup();
     await plugin(host.bb);
@@ -420,8 +420,71 @@ describe("queued thread promotion", () => {
     });
   });
 
+  it("moves a restarted Completed thread through Active and back to Queued", async () => {
+    const { harness, thread } = await promotionHost();
+    await harness.behavior.callRpc("setPreference", {
+      key: "completedSectionId",
+      value: "sec_completed",
+    });
+    let current = makeThreadResponse({
+      ...thread,
+      sectionId: "sec_completed",
+    });
+    harness.sdk.stub("threads.get", async () => current);
+    harness.sdk.stub("threads.update", async ({ sectionId }) => {
+      current = { ...current, sectionId: sectionId ?? null };
+      return current;
+    });
+    await harness.behavior.emitThreadEvent("thread.active", {
+      thread: current,
+    });
+    expect(current.sectionId).toBe("sec_active");
+    expect(
+      await harness.behavior.callRpc("listPreferences", null),
+    ).toMatchObject({
+      preferences: { manualThreadOrder: ["queued", "existing", "other"] },
+    });
+    current = { ...current, status: "idle" };
+    await harness.behavior.emitThreadEvent("thread.idle", {
+      thread: current,
+      lastAssistantText: "Done",
+    });
+    expect(harness.sdk.callsTo("threads.update")).toEqual([
+      [{ threadId: thread.id, sectionId: "sec_active" }],
+      [{ threadId: thread.id, sectionId: null }],
+    ]);
+  });
+
   it.each([
-    { sectionId: "sec_completed" },
+    { sectionId: "sec_active" },
+    { sectionId: "sec_completed", pinnedAt: 1 },
+    { sectionId: "sec_completed", archivedAt: 1 },
+    { sectionId: "sec_completed", parentThreadId: "parent" },
+    { sectionId: "sec_completed", status: "idle" as const },
+  ])("preserves ineligible Completed threads: %j", async (overrides) => {
+    const { harness, thread } = await promotionHost();
+    await harness.behavior.callRpc("setPreference", {
+      key: "completedSectionId",
+      value:
+        overrides.sectionId === "sec_active" ? "sec_active" : "sec_completed",
+    });
+    harness.sdk.stub("threads.get", async () => ({ ...thread, ...overrides }));
+    await harness.behavior.emitThreadEvent("thread.active", { thread });
+    expect(harness.sdk.callsTo("threads.update")).toEqual([]);
+  });
+
+  it("does not infer a Completed section when none is configured", async () => {
+    const { harness, thread } = await promotionHost();
+    harness.sdk.stub("threads.get", async () => ({
+      ...thread,
+      sectionId: "sec_completed",
+    }));
+    await harness.behavior.emitThreadEvent("thread.active", { thread });
+    expect(harness.sdk.callsTo("threads.update")).toEqual([]);
+  });
+
+  it.each([
+    { sectionId: "sec_other" },
     { sectionId: "sec_active" },
     { pinnedAt: 1 },
     { archivedAt: 1 },

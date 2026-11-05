@@ -47,6 +47,7 @@ import {
   ThreadArchiveDialog,
   type ThreadArchiveDialogTarget,
 } from "@/components/dialogs/ThreadArchiveDialog";
+import { getSidebarThreadNavigationTargets } from "@/components/sidebar/sidebarThreadShortcuts";
 import { useArchiveUndo } from "./useArchiveUndo";
 import { ArchivedThreadToastDescription } from "@/components/thread/ArchivedThreadToastDescription";
 import { destroyPersistedBrowserViewsForThread } from "@/components/secondary-panel/browserViewVisibilityCoordinator";
@@ -104,6 +105,34 @@ interface ThreadActionContext {
 }
 
 const ARCHIVE_UNDO_TOAST_DURATION_MS = 10_000;
+
+function archiveNavigationCandidates(threadId: string) {
+  const source = [
+    ...document.querySelectorAll<HTMLAnchorElement>(
+      "a[data-sidebar-thread-id]",
+    ),
+  ].find((link) => link.dataset.sidebarThreadId === threadId);
+  if (!source) return [];
+  const root =
+    source.closest<HTMLElement>('[data-sidebar="content"]') ?? document.body;
+  const targets = getSidebarThreadNavigationTargets(root);
+  const index = targets.findIndex((target) => target.threadId === threadId);
+  if (index === -1) return [];
+  return [
+    ...targets.slice(index + 1),
+    ...targets.slice(0, index).reverse(),
+  ].flatMap((target) => {
+    const href =
+      target.element?.getAttribute("href") ??
+      (target.projectId === null
+        ? null
+        : getThreadRoutePath({
+            projectId: target.projectId,
+            threadId: target.threadId,
+          }));
+    return href === null ? [] : [{ threadId: target.threadId, href }];
+  });
+}
 
 export function ThreadActionsProvider({
   children,
@@ -419,6 +448,7 @@ export function ThreadActionsProvider({
       closeDialog,
       thread,
     }: ArchiveThreadActionRequest) => {
+      const navigationCandidates = archiveNavigationCandidates(thread.id);
       archiveThreadAndChildrenMutateAsync({
         id: thread.id,
         childThreadsConfirmed,
@@ -426,23 +456,41 @@ export function ThreadActionsProvider({
         (response) => {
           closeDialog?.();
           const viewedThreadId = viewedThreadIdRef.current;
-          const archiveDisplacedThread = viewedThreadId === thread.id;
+          const archiveDisplacedThread =
+            viewedThreadId !== undefined &&
+            response.archivedThreadIds.includes(viewedThreadId);
+          const nextThread = navigationCandidates.find(
+            (candidate) =>
+              !response.archivedThreadIds.includes(candidate.threadId),
+          );
           const closeResult = closePanesForThreads(response.archivedThreadIds);
           const archiveDestination =
-            archiveDisplacedThread &&
+            nextThread?.href ??
+            (archiveDisplacedThread &&
             closeResult.removedAny &&
             closeResult.focusedRoute !== null
               ? getThreadRoutePath(closeResult.focusedRoute)
               : archiveDisplacedThread
                 ? getRootComposeRoutePath()
-                : null;
+                : null);
           const navigateAwayIfArchived = () => {
             const viewed = viewedThreadIdRef.current;
             if (viewed && response.archivedThreadIds.includes(viewed)) {
               navigate(getRootComposeRoutePath());
             }
           };
-          syncNavigationAfterClose(closeResult, navigateAwayIfArchived);
+          if (nextThread) {
+            navigate(nextThread.href);
+            const link = [
+              ...document.querySelectorAll<HTMLAnchorElement>(
+                "a[data-sidebar-thread-id]",
+              ),
+            ].find(
+              (element) =>
+                element.dataset.sidebarThreadId === nextThread.threadId,
+            );
+            link?.focus({ preventScroll: true });
+          } else syncNavigationAfterClose(closeResult, navigateAwayIfArchived);
           if (archiveDestination !== null) {
             viewedRouteRef.current = archiveDestination;
           }

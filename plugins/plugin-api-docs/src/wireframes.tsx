@@ -550,7 +550,7 @@ const SIDEBAR_SECTION_RENDERERS: Record<string, () => ReactNode> = {
   "thread-list": () => (
     <RegionMark
       id="thread-list"
-      label="The thread list, replaceable by one plugin"
+      label="The thread list and project menus, replaceable by one plugin"
       className="mx-1.5 flex-1 px-1.5 py-1.5"
       showChip={false}
     >
@@ -591,6 +591,9 @@ const SIDEBAR_SECTION_RENDERERS: Record<string, () => ReactNode> = {
           <MiniIcon icon="ChevronRight" className="size-3.5" />
         </span>
       ))}
+      <span className="block px-2 pt-2 text-xs text-subtle-foreground/75">
+        Project menu · Edit project…
+      </span>
     </RegionMark>
   ),
   footer: () => (
@@ -1008,7 +1011,7 @@ export function AppShellWireframe({
           />
           <MeasuredBadge
             id="thread-list"
-            label="The thread list, replaceable by one plugin"
+            label="The thread list and project menus, replaceable by one plugin"
             anchor='[data-guide-region="thread-list"]'
             at="start"
           />
