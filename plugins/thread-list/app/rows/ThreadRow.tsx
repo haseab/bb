@@ -1,3 +1,6 @@
+import { QuickDecisionDot } from "../decisions/QuickDecisionDot.js";
+import { useQuickDecision } from "../decisions/state.js";
+import type { QuickDecision } from "../../shared/decisions.js";
 import {
   BB_THREAD_ORIGIN_COLOR,
   threadOrigin,
@@ -304,10 +307,12 @@ export function CollapsedThreadStatusGlyph({
 }
 
 function ThreadTrailingIndicator({
+  decision,
   state,
   hideIdleDraftLabel,
   rowStatus,
 }: {
+  decision: QuickDecision | null;
   state: ThreadListIndicatorState;
   hideIdleDraftLabel: boolean;
   rowStatus: PluginSidebarThreadRowStatus | null;
@@ -317,7 +322,15 @@ function ThreadTrailingIndicator({
     rowStatus,
   );
 
-  if (indicatorKind === "none" && !rowStatusIsVisible) {
+  const showDecision =
+    decision !== null &&
+    (indicatorKind === "unread-success" ||
+      indicatorKind === "waiting-for-input" ||
+      indicatorKind === "none" ||
+      indicatorKind === "draft") &&
+    !rowStatusIsVisible;
+
+  if (!showDecision && indicatorKind === "none" && !rowStatusIsVisible) {
     return null;
   }
 
@@ -329,11 +342,15 @@ function ThreadTrailingIndicator({
         SIDEBAR_STATUS_GLYPH_BOX_CLASS,
       )}
     >
-      <ThreadStatusGlyph
-        indicator={indicatorKind}
-        rowStatus={rowStatus}
-        hideIdleDraftLabel={hideIdleDraftLabel}
-      />
+      {showDecision ? (
+        <QuickDecisionDot decision={decision} />
+      ) : (
+        <ThreadStatusGlyph
+          indicator={indicatorKind}
+          rowStatus={rowStatus}
+          hideIdleDraftLabel={hideIdleDraftLabel}
+        />
+      )}
     </span>
   );
 }
@@ -514,6 +531,10 @@ function ThreadRowComponent({
   const reserveActionSpace =
     crossProjectLabel !== null || (isParentRow && hasChildren);
   const hasHiddenChildren = isParentRow && isParentCollapsed && hasChildren;
+  const quickDecision = useQuickDecision(
+    thread,
+    hasHiddenChildren ? childActivity.threadIds : NO_THREAD_IDS,
+  );
   const hiddenChildrenHaveDraft = useThreadsHaveDraft(
     hasHiddenChildren ? childActivity.threadIds : NO_THREAD_IDS,
   );
@@ -926,7 +947,7 @@ function ThreadRowComponent({
                   "absolute inset-0 flex items-center justify-center",
                 )}
               >
-                {miniMap ? (
+                {miniMap && quickDecision === null ? (
                   <span
                     data-sidebar-thread-trailing-indicator=""
                     className={cn(
@@ -942,6 +963,7 @@ function ThreadRowComponent({
                   </span>
                 ) : (
                   <ThreadTrailingIndicator
+                    decision={quickDecision}
                     state={trailingIndicatorState}
                     hideIdleDraftLabel={
                       !hasHiddenChildren && trailingIndicatorKind === "draft"

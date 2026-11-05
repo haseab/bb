@@ -100,3 +100,13 @@ discover cloud-only Codex conversations or create projects for unknown paths.
 `threads.experimental_syncNativeSession(snapshot)` exposes the core ingestion
 route to SDK callers that already have a provider-normalized snapshot. The Codex
 provider uses that same route through its first-party adapter.
+
+## Helper AI completion
+
+The provider exposes the same helper completion service over plugin RPC:
+`plugins.callRpc({ pluginId: "provider-codex", method: "ai.complete", input:
+{ prompt }, outputSchema })` returns `{ text }`. Prompts are limited to 24,000
+characters. It uses the primary machine's existing Codex credentials and the same
+models, deadlines, and fallback as titles and commit messages. Thread-list decision
+classification uses this path. Subscription sign-ins share the account's allowance;
+API-key sign-ins follow the existing API billing route. Credentials stay on the host.

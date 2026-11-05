@@ -1,3 +1,4 @@
+import { QuickDecisionsSync } from "./app/decisions/state.js";
 import {
   definePluginApp,
   type PluginThreadListProps,
@@ -39,6 +40,7 @@ function ThreadList({
       <TooltipProvider>
         <PreferencesSync />
         <BacklogSync />
+        <QuickDecisionsSync />
         <BacklogTriage />
         <ThreadCompletionControls />
         <ThreadPinControls />

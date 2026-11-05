@@ -1,3 +1,5 @@
+import { decisionsRpcContract } from "./shared/decisions.js";
+import { createDecisionPolicy, decisionCommands } from "./decisions/policy.js";
 import {
   cliCommand,
   defineCli,
@@ -41,6 +43,7 @@ const preferenceValuesSchema = z.object(
 
 export const threadListRpcContract = defineRpcContract({
   ...backlogRpcContract,
+  ...decisionsRpcContract,
   setCompleted: {
     input: z
       .object({ threadId: z.string().min(1), completed: z.boolean() })
@@ -205,6 +208,7 @@ export default async function threadListPlugin(bb: BbPluginApi) {
     return result;
   }
   const backlog = createBacklogPolicy(bb, store);
+  const decisions = createDecisionPolicy(bb, store);
   bb.background.schedule("backlog-refresh", "* * * * *", () =>
     serialize(backlog.reconcile).then(() => {}),
   );
@@ -228,6 +232,7 @@ export default async function threadListPlugin(bb: BbPluginApi) {
       const thread = await bb.sdk.threads.get({ threadId });
       if (thread.archivedAt !== null || thread.deletedAt !== null)
         throw new Error("Unarchive the thread before changing completion.");
+      if (completed) decisions.clear(threadId);
       const sections = await bb.sdk.threadSections.list();
       const savedId = await store.read("completedSectionId");
       let section =
@@ -337,6 +342,11 @@ export default async function threadListPlugin(bb: BbPluginApi) {
   });
 
   bb.rpc.register(threadListRpcContract, {
+    decisionsState: () => decisions.snapshot(),
+    refreshDecision: async ({ threadId }) => {
+      await decisions.analyze(threadId, undefined, true);
+      return decisions.snapshot();
+    },
     backlogState: () => serialize(backlog.reconcile),
     scheduleFollowUp: ({ threadId, input, timeZone, onlyBacklog }) =>
       serialize(() => backlog.schedule(threadId, input, timeZone, onlyBacklog)),
@@ -364,6 +374,7 @@ export default async function threadListPlugin(bb: BbPluginApi) {
         "Organization mode, sort, section order, hidden groups, and collapsed groups for bb's sidebar thread list. Values are JSON; a bare word is read as a string.",
       commands: {
         ...backlogCommands(backlog, serialize),
+        ...decisionCommands(decisions),
         complete: cliCommand({
           summary:
             "Complete a thread and move it to Completed without archiving",

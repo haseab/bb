@@ -1,3 +1,4 @@
+import { useDecisionComparator } from "../decisions/state.js";
 import { VisibleSidebarThreadsProvider } from "./VisibleSidebarThreads.js";
 import {
   ThreadListVisibility,
@@ -1612,8 +1613,12 @@ function ProjectListComponent({
     selectedThreadId,
     comparator: baseThreadComparator,
   });
-  const sidebarThreadComparator = useRefreshedQueueComparator(
+  const refreshedThreadComparator = useRefreshedQueueComparator(
     readStatusComparator,
+    threads,
+  );
+  const sidebarThreadComparator = useDecisionComparator(
+    refreshedThreadComparator,
     threads,
   );
   const collapsedEnvironmentIds = useMemo(

@@ -263,3 +263,35 @@ After typing, these shortcuts belong to the editor again; Undo and Confirm
 remain clickable in the toast. CLI and RPC completion remain immediate.
 
 During Backlog follow-up triage, Cmd+P peeks at the thread’s human input messages. Cmd+P or Escape returns to the same date draft. CLI: `bb thread log <id> --user-messages --all`. Plugins can use `navigate.toThread(id, { experimental_userMessagesOnly: true })`, and pass false to restore the timeline.
+
+## Quick-decision dots
+
+The existing unread/status dot becomes strong red for an almost immediate decision,
+or lighter red for a short read or brief reply. A tooltip explains the estimate.
+The ordinary unread dot remains blue; failures keep the existing error icon.
+Quick decisions sort first in the unsectioned queue (instant, then quick), retaining
+saved order within each tier. Pinned and custom-section order are preserved. A
+blocked child can bring its queued parent forward without detaching the child.
+Reading a thread leaves its decision outstanding; replying, resuming, resolving the
+question, completing, archiving, or deleting clears it.
+
+New idle replies and pending questions are classified once, in the background,
+through the Codex provider's existing AI completion service and primary-machine
+sign-in. These requests use that account's allowance. There is no history backfill
+or inference on sidebar render. Uncertain, malformed, unavailable, consequential,
+or context-heavy decisions retain normal appearance and order. Estimates concern
+human attention, not task duration or urgency.
+
+```sh
+bb thread-list decisions list --json
+bb thread-list decisions refresh <thread-id> --json
+bb thread-list prefs set quickDecisions false
+```
+
+`quickDecisions` defaults to true. Turning it off hides decision dots and ordering
+and stops new classification requests. An explicit refresh retries a request after
+an unavailable service or classifies an existing thread. SDK clients use
+`plugins.callRpc` with plugin id `thread-list`, method `decisionsState`, input
+`null`, or method `refreshDecision`, input `{ threadId }`. Both return
+`{ items: [{ threadId, requestKey, interactionId, level, reason, classifiedAt }] }`.
+Full conversation text and credentials are not stored in decision metadata.

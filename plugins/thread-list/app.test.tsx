@@ -8,6 +8,9 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { getDefaultStore } from "jotai";
+import { quickDecisionsStateAtom } from "./app/decisions/state.js";
+import type { QuickDecision } from "./shared/decisions.js";
 import { makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PluginThreadListProps } from "@get-bb/plugin-sdk/app";
@@ -159,6 +162,7 @@ function threadIds(): string[] {
 
 afterEach(() => {
   cleanup();
+  getDefaultStore().set(quickDecisionsStateAtom, { items: [] });
   resetPreferencesSyncForTest();
   setPreferencesMirrorStorageForTest(undefined);
 });
@@ -486,6 +490,7 @@ describe("thread-list plugin", () => {
     expect(rpcCalls.map((call) => call.method)).toEqual([
       "listPreferences",
       "backlogState",
+      "decisionsState",
     ]);
     expect(sectionHeaders()).toEqual(["Pinned", "Later", "Review", "Threads"]);
     expect(threadIds()).toEqual([
@@ -707,4 +712,107 @@ describe("thread-list plugin", () => {
     link.click();
     await waitFor(() => expect(listProps.onNavigate).toHaveBeenCalledOnce());
   });
+});
+
+it("promotes quick decisions inside Queued and restores manual order after answering", async () => {
+  const threads = ["ordinary", "quick", "instant"].map((id) =>
+    makeSidebarThread({
+      id,
+      title: id,
+      latestAttentionAt: 10,
+      projectId: PERSONAL_PROJECT_ID,
+    }),
+  );
+  const items: QuickDecision[] = [
+    {
+      threadId: "quick",
+      level: "quick",
+      reason: "Brief reply",
+      requestKey: "idle:10:quick",
+      interactionId: null,
+      classifiedAt: 1,
+    },
+    {
+      threadId: "instant",
+      level: "instant",
+      reason: "One choice",
+      requestKey: "idle:10:instant",
+      interactionId: null,
+      classifiedAt: 2,
+    },
+  ];
+  const preferences = {
+    ...defaultPreferences(),
+    chronologicalSort: "manual" as const,
+    manualThreadOrder: ["ordinary", "quick", "instant"],
+  };
+  const slot = renderList(
+    {},
+    {
+      sidebarThreads: { projects: PROJECTS, threads, sections: [] },
+      rpc: {
+        listPreferences: () => ({ preferences }),
+        decisionsState: () => ({ items }),
+      },
+    },
+  );
+  await waitFor(() =>
+    expect(threadIds()).toEqual(["instant", "quick", "ordinary"]),
+  );
+  await act(async () => {
+    await slot.behavior.emitRealtime("quick-decisions", { items: [] });
+  });
+  await waitFor(() =>
+    expect(threadIds()).toEqual(["ordinary", "quick", "instant"]),
+  );
+  expect(
+    slot.inspection.rpcCalls.filter((call) => call.method === "setPreference"),
+  ).toEqual([]);
+});
+
+it("does not overwrite a newer realtime decision with a late initial snapshot", async () => {
+  let finish!: (value: { items: QuickDecision[] }) => void;
+  const thread = makeSidebarThread({
+    id: "instant",
+    title: "Choose a format",
+    projectId: PERSONAL_PROJECT_ID,
+    latestAttentionAt: 10,
+  });
+  const slot = renderList(
+    {},
+    {
+      sidebarThreads: { projects: PROJECTS, threads: [thread], sections: [] },
+      rpc: {
+        listPreferences: () => ({ preferences: defaultPreferences() }),
+        decisionsState: () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      },
+    },
+  );
+  await waitFor(() =>
+    expect(
+      slot.inspection.rpcCalls.some((call) => call.method === "decisionsState"),
+    ).toBe(true),
+  );
+  await act(async () => {
+    await slot.behavior.emitRealtime("quick-decisions", {
+      items: [
+        {
+          threadId: thread.id,
+          level: "instant",
+          reason: "One choice",
+          requestKey: "idle:10:request",
+          interactionId: null,
+          classifiedAt: 1,
+        },
+      ],
+    });
+  });
+  expect(screen.getByLabelText("Instant decision: One choice")).toBeTruthy();
+  await act(async () => {
+    finish({ items: [] });
+  });
+  expect(screen.getByLabelText("Instant decision: One choice")).toBeTruthy();
 });

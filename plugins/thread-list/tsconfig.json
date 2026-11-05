@@ -24,6 +24,7 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "shared/**/*.ts",
+    "decisions/**/*.ts",
     "vitest.config.ts"
   ]
 }

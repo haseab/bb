@@ -1114,6 +1114,7 @@ row's Customize actions, or `bb thread-list prefs get|set|reset <key>`
 | --------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `organizationMode`    | `chronological`                   | `project`, `chronological` (Custom), or `machine`                                                                                           |
 | `environmentGrouping` | `auto`                            | `true` collapses sibling threads sharing a worktree into one row, `false` never does, `auto` groups except in `chronological`               |
+| `quickDecisions`      | `true`                            | Uses Codex sign-in for red decision dots and priority ordering in the unsectioned queue; no history backfill.                               |
 | `groupByReadStatus`   | `false`                           | Lists unread threads above the rest; exclusive with environment grouping                                                                    |
 | `chronologicalSort`   | `updated`                         | Sort field for `chronological`                                                                                                              |
 | `sortDirection`       | `default`                         | `default`, `ascending`, or `descending`                                                                                                     |

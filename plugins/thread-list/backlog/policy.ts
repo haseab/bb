@@ -1,3 +1,4 @@
+import { openThreadListDatabase } from "../storage.js";
 import {
   type BbPluginApi,
   cliCommand,
@@ -19,11 +20,7 @@ export function createBacklogPolicy(
   bb: BbPluginApi,
   preferences: ReturnType<typeof createPreferenceStore>,
 ) {
-  const db = bb.storage.database();
-  bb.storage.migrate(db, [
-    `CREATE TABLE backlog_threads (threadId TEXT PRIMARY KEY, sectionId TEXT NOT NULL, enteredAt INTEGER NOT NULL, followUpAt INTEGER, refreshAt INTEGER NOT NULL, refreshedAt INTEGER, stage TEXT NOT NULL CHECK (stage IN ('backlog','refreshing','refreshed')))`,
-    `CREATE INDEX backlog_threads_due ON backlog_threads(stage, refreshAt)`,
-  ]);
+  const db = openThreadListDatabase(bb);
   let sectionId: string | null = null;
   const rows = () =>
     backlogItemSchema

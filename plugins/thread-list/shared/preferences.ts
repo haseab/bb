@@ -125,6 +125,12 @@ export const preferenceDefinitions = {
     "Whether sibling threads sharing a worktree collapse into one row. auto groups them in every organization except chronological.",
     "sidebar.threadGrouping.environment",
   ),
+  quickDecisions: definePreference(
+    z.boolean(),
+    true,
+    "Use the existing Codex login to classify new decision requests, tint their dots red, and promote quick decisions in Queued. No history backfill.",
+    null,
+  ),
   groupByReadStatus: definePreference(
     z.boolean(),
     false,
