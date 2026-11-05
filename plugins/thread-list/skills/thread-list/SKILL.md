@@ -178,7 +178,59 @@ it; Enter opens it, or starts inline rename when it is already open. The selecto
 menu and preserves a neighboring selector. Pipeline movement commands target
 the focused row, so Option+Up/Down reorders the selector's thread. Returning
 from chat restores the last sidebar selection. Focus shortcuts and archive
-are rebindable through core Keyboard settings.
+are rebindable through core Keyboard settings. Press P while the sidebar selector is
+on a thread to pin it, or unpin it when already pinned. This shortcut only acts
+on the focused sidebar row and leaves typing in editors unchanged. To add a
+modifier shortcut, bind `plugin:thread-list/pin` in Settings → Keyboard. SDK and CLI clients use the
+existing `threads.pin` / `threads.unpin` and `bb thread pin` / `bb thread unpin`
+operations.
+
+## Backlog follow-ups
+
+The section named Backlog is adopted automatically. `backlogSectionId` (default
+`null`) records its id; set it explicitly to use another section. A deleted
+configured section disables refresh until it is reconfigured. Entering Backlog
+starts an implicit seven-day countdown (`backlogRefreshDays`, default `7`, range
+1–3650). Existing Backlog roots start their first countdown when the policy first
+observes them. Children stay with their root. Pinned, archived, deleted, and
+manually moved threads are not pulled back by an old deadline.
+
+Command+E (Control+E elsewhere), command `plugin:thread-list/triage-backlog`, walks
+through Backlog roots that have no explicit follow-up date. It never includes
+Queued or Active threads, or threads already given a date. Type `7d`, `7 days`,
+`61 min`, `tomorrow at 3pm`, or `Sep 1`; the input previews the resolved local
+date. Enter saves and advances, Tab or Skip leaves the default countdown, and Escape
+closes. Date-only input uses 9am in the client's timezone; a date without a year
+uses its next occurrence. Invalid and past dates cannot be saved. Explicit dates
+replace the implicit deadline. A thread's Follow up… menu action can edit an
+existing date or schedule a Queued/Active thread, moving it to Backlog without
+stopping its run. Cmd+E still only triages unscheduled Backlog work.
+
+The server checks deadlines every minute and once at startup, so overdue work
+catches up after downtime. It waits for running threads to become idle. Due
+threads return to the bottom of the unsectioned Queued group, below the
+horizontal Refreshed divider. They remain there when opened; sending a message
+or starting a run makes them hot again. Refresh does not send a message or start
+an agent. Worktree grouping cannot merge hot and refreshed rows across the
+divider. Deadlines and refreshed markers are stored in the plugin's database.
+
+```sh
+bb thread-list backlog list --json
+bb thread-list backlog schedule <thread-id> '61 min' --timezone America/Los_Angeles
+bb thread-list backlog clear <thread-id>
+bb thread-list prefs set backlogRefreshDays 7
+bb thread-list prefs set backlogSectionId <section-id>
+```
+
+`backlog clear` removes an explicit date and restarts the default countdown.
+The `backlogState`, `scheduleFollowUp`, and `clearFollowUp` plugin RPCs expose the
+same operations through `bb.sdk.plugins.callRpc`. `scheduleFollowUp` accepts
+`{threadId, input, timeZone, onlyBacklog?}`; `onlyBacklog: true` rejects threads
+moved out of Backlog while triage was open. The other inputs are `null` and
+`{threadId}`, respectively. Every result is `{sectionId, items}`. Each item has
+`threadId`, `sectionId`, `enteredAt`, `followUpAt` (null for the implicit policy),
+`refreshAt`, `refreshedAt`, and `stage` (`backlog`, `refreshing`, or `refreshed`).
+CLI defaults to the server's timezone; pass `--timezone` for the client's zone.
 
 ## Visible threads
 
@@ -201,3 +253,5 @@ and archive; Command/Control+Enter confirms it and dismisses the toast.
 Completion Undo restores the previous section, parent, and pinned state.
 After typing, these shortcuts belong to the editor again; Undo and Confirm
 remain clickable in the toast. CLI and RPC completion remain immediate.
+
+During Backlog follow-up triage, Cmd+P peeks at the thread’s human input messages. Cmd+P or Escape returns to the same date draft. CLI: `bb thread log <id> --user-messages --all`. Plugins can use `navigate.toThread(id, { experimental_userMessagesOnly: true })`, and pass false to restore the timeline.

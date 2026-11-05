@@ -3684,3 +3684,7 @@ this same route so database operations execute through the server's normal reque
 while plugins pass plain snapshots. The core route is also
 available to SDK clients. Before stabilization, audit provider-specific validation,
 external user-message origins, host/project mapping and concurrent writers.
+
+## BbNavigate.toThread experimental_userMessagesOnly
+
+Transient human-input-only timeline mode used by Thread List Backlog peek. False or ordinary navigation restores the full timeline. The shared ThreadTimelineSurface filters assistant, agent and system rows, preserving native user attachments, and loads older pages. Audit nested turn filtering, cancellation and keyboard focus before stabilization.

@@ -62,6 +62,7 @@ export type ThreadComparator = ((
   right: SidebarThread,
 ) => number) & {
   compareItems?: ThreadItemComparator;
+  separateEnvironmentThread?: (thread: SidebarThread) => boolean;
 };
 
 type SidebarProjectThreadShape = Pick<SidebarThread, "isHidden">;
@@ -455,6 +456,7 @@ function bucketEnvironmentThreadGroups(
     const environment = node.thread.environment;
     const environmentId = environment?.id ?? null;
     if (
+      compareThreads.separateEnvironmentThread?.(node.thread) ||
       environmentId === null ||
       environmentId === parentEnvironmentId ||
       environment?.isWorktree !== true
@@ -484,7 +486,11 @@ function bucketEnvironmentThreadGroups(
 
   const looseNodes = nodes.filter((node) => {
     const environmentId = node.thread.environment?.id ?? null;
-    return environmentId === null || !groupedEnvironmentIds.has(environmentId);
+    return (
+      compareThreads.separateEnvironmentThread?.(node.thread) ||
+      environmentId === null ||
+      !groupedEnvironmentIds.has(environmentId)
+    );
   });
   looseNodes.sort((left, right) => compareThreads(left.thread, right.thread));
 

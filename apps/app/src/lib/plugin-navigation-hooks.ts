@@ -1,3 +1,4 @@
+import { threadUserMessagesOnlyAtom } from "@/components/thread/timeline/user-message-peek";
 import { useCallback, useContext, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
@@ -50,6 +51,10 @@ export function useBbNavigate(): BbNavigate {
   const setRootComposeProjectId = useSetRootComposeProjectId();
   const toThread = useCallback<BbNavigate["toThread"]>(
     (threadId, options) => {
+      store.set(
+        threadUserMessagesOnlyAtom(threadId),
+        options?.experimental_userMessagesOnly ?? false,
+      );
       onNavigate?.();
       const open = (projectId: string) => {
         store.set(getThreadConversationCollapsedAtom(threadId), false);

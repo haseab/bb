@@ -64,10 +64,8 @@ afterEach(() => {
 const search = () => screen.getByRole("combobox", { name: "Search projects" });
 
 async function openPicker() {
-  const trigger = screen.getByRole("button", { name: "Choose project" });
-  if (trigger.getAttribute("aria-expanded") === "false")
-    fireEvent.click(trigger);
   await waitFor(() => expect(document.activeElement).toBe(search()));
+  await screen.findByRole("listbox");
 }
 
 it("starts in search, filters with the keyboard, and focuses the composer after Enter", async () => {
@@ -90,14 +88,17 @@ it("starts in search, filters with the keyboard, and focuses the composer after 
   expect(screen.getByText("Alpha Web")).toBeTruthy();
 });
 
-it("preselects the last project and supports arrow navigation", async () => {
+it("preselects No project first and supports arrow navigation", async () => {
   const select = vi.fn(async () => {});
   render(<Flow onSelectProject={select} />);
   await openPicker();
-  expect(screen.getAllByRole("option")[0]?.textContent).toContain("BB");
+  expect(screen.getAllByRole("option")[0]?.textContent).toBe("No project");
+  expect(screen.getAllByRole("option")[0]?.getAttribute("aria-selected")).toBe(
+    "true",
+  );
   fireEvent.keyDown(search(), { key: "ArrowDown" });
   fireEvent.keyDown(search(), { key: "Enter" });
-  await waitFor(() => expect(select).toHaveBeenCalledWith("alpha"));
+  await waitFor(() => expect(select).toHaveBeenCalledWith("bb"));
 });
 
 it("supports a personal workspace and changing projects without losing the message", async () => {
@@ -190,7 +191,7 @@ it("shows loading and offers no-project and creation when the project list is em
   expect(screen.getByRole("option", { name: /No project/ })).toBeTruthy();
 });
 
-it("keeps the last project highlighted when project loading finishes", async () => {
+it("keeps No project highlighted when project loading finishes", async () => {
   const select = vi.fn(async () => {});
   const { rerender } = render(
     <Flow projects={undefined} onSelectProject={select} />,
@@ -199,59 +200,49 @@ it("keeps the last project highlighted when project loading finishes", async () 
   rerender(<Flow onSelectProject={select} />);
   expect(document.activeElement).toBe(search());
   fireEvent.keyDown(search(), { key: "Enter" });
-  await waitFor(() => expect(select).toHaveBeenCalledWith("bb"));
+  await waitFor(() => expect(select).toHaveBeenCalledWith(PERSONAL_PROJECT_ID));
 });
 
-it("waits half a second, animates open, then focuses search", () => {
+it("focuses search immediately and animates only the project list open after 200 ms", () => {
   vi.useFakeTimers();
   render(<Flow />);
-  const trigger = screen.getByRole("button", { name: "Choose project" });
-  expect(trigger.getAttribute("aria-expanded")).toBe("false");
-  expect(screen.queryByRole("combobox")).toBeNull();
-  act(() => vi.advanceTimersByTime(499));
-  expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  expect(document.activeElement).toBe(search());
+  expect(search().getAttribute("aria-expanded")).toBe("false");
+  const options = document.querySelector("[data-project-options-state]");
+  expect(options?.getAttribute("data-project-options-state")).toBe("closed");
+  expect(options?.className).toContain(
+    "transition-[grid-template-rows,opacity]",
+  );
+  expect(options?.className).toContain("motion-reduce:transition-none");
+  expect(screen.queryByRole("listbox")).toBeNull();
+  fireEvent.change(search(), { target: { value: "Alpha" } });
+  act(() => vi.advanceTimersByTime(199));
+  expect(document.activeElement).toBe(search());
+  expect(screen.queryByRole("listbox")).toBeNull();
   act(() => vi.advanceTimersByTime(1));
-  expect(trigger.getAttribute("aria-expanded")).toBe("true");
-  expect(screen.queryByRole("combobox")).toBeNull();
-  act(() => vi.advanceTimersByTime(300));
-  expect(document.activeElement).toBe(search());
-});
-
-it("opens from the keyboard and keeps text typed during expansion", () => {
-  vi.useFakeTimers();
-  render(<Flow />);
-  const trigger = screen.getByRole("button", { name: "Choose project" });
-  fireEvent.keyDown(trigger, { key: "A" });
-  fireEvent.keyDown(trigger, { key: "l" });
-  fireEvent.keyDown(trigger, { key: " " });
-  fireEvent.keyDown(trigger, { key: "W" });
-  fireEvent.keyDown(trigger, { key: "Backspace" });
-  fireEvent.keyDown(trigger, { key: "Backspace" });
-  expect(trigger.getAttribute("aria-expanded")).toBe("true");
-  act(() => vi.advanceTimersByTime(300));
-  expect(document.activeElement).toBe(search());
-  expect((search() as HTMLInputElement).value).toBe("Al");
+  expect(screen.getByRole("listbox")).toBeTruthy();
+  expect(options?.getAttribute("data-project-options-state")).toBe("open");
+  expect(search().getAttribute("aria-expanded")).toBe("true");
+  expect((search() as HTMLInputElement).value).toBe("Alpha");
   expect(screen.getByRole("option", { name: /Alpha Web/ })).toBeTruthy();
   expect(screen.queryByRole("option", { name: /BB/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Choose project" })).toBeNull();
+  expect(screen.queryByText("Where would you like to work?")).toBeNull();
 });
 
-it("cancels delayed opening on unmount", () => {
-  vi.useFakeTimers();
-  const { unmount } = render(<Flow />);
-  unmount();
-  act(() => vi.advanceTimersByTime(1000));
-  expect(vi.getTimerCount()).toBe(0);
-});
-
-it("skips the expansion motion when reduced motion is enabled", () => {
-  vi.useFakeTimers();
-  const matchMedia = window.matchMedia.bind(window);
-  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    ...matchMedia(query),
-    matches: query === "(prefers-reduced-motion: reduce)",
-  }));
-  render(<Flow />);
-  act(() => vi.advanceTimersByTime(500));
-  act(() => vi.advanceTimersByTime(0));
-  expect(document.activeElement).toBe(search());
-});
+it.each([projects, undefined])(
+  "Enter immediately selects No project before the list opens, even while projects are loading (%j)",
+  async (available) => {
+    const select = vi.fn(async () => {});
+    render(<Flow projects={available} onSelectProject={select} />);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(search());
+    fireEvent.keyDown(search(), { key: "Enter" });
+    await waitFor(() =>
+      expect(select).toHaveBeenCalledWith(PERSONAL_PROJECT_ID),
+    );
+    expect(
+      await screen.findByRole("textbox", { name: "Message" }),
+    ).toBeTruthy();
+  },
+);

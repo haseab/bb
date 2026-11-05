@@ -1163,6 +1163,27 @@ threads retain their placement; completion remains manual. A deleted destination
 is ignored. Use `bb thread-list prefs set autoActiveSectionId <section-id>` or the
 plugin's `setPreference` RPC to configure it.
 
+Backlog follow-ups are owned by the Thread list plugin. `backlogSectionId`
+(default `null`) adopts the section named Backlog on first reconciliation;
+a configured but deleted section pauses refresh until reconfigured.
+`backlogRefreshDays` (default `7`, range 1–3650) gives newly backlogged root
+threads an implicit return deadline. Existing Backlog roots receive their first
+countdown when the policy first sees them. Explicit follow-up dates override
+that default. Change these through `bb thread-list prefs set` or `setPreference`.
+
+Command/Control+E (`plugin:thread-list/triage-backlog`) walks only unscheduled
+Backlog roots, with a natural-language date field and local-time preview.
+`7d`, `7 days`, `61 min`, and `Sep 1` are accepted; date-only inputs use 9am and
+past dates are rejected. Follow up… in a thread menu can also schedule a Queued
+or Active thread by moving it into Backlog. The server sweeps every minute and
+at startup. Due idle roots return below a Refreshed divider at the bottom of
+Queued; opening one keeps it refreshed, while messaging/running it makes it hot.
+Manual moves, pins, archives, and deletions invalidate stale deadlines.
+The plugin database persists deadlines and refreshed state across restarts.
+Use `bb thread-list backlog list|schedule|clear` or the `backlogState`,
+`scheduleFollowUp`, and `clearFollowUp` plugin RPCs for equivalent automation.
+The Thread list skill documents their inputs and timezone behavior.
+
 `rowActions` keys are `bb--core/<id>` (`split`, `newThreadInEnvironment`,
 `copyLink`, `read`, `pin`, `rename`, `archive`, `delete`), `thread-list/move`,
 or a plugin's `<pluginId>/<actionId>`. Bare legacy ids and `core/<id>` keys

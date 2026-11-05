@@ -4852,7 +4852,14 @@ export interface BbNavigate {
    * falls back to plain navigation where splits are off. Opening also expands
    * the thread's conversation if the side panel had collapsed it.
    */
-  toThread(threadId: string, options?: { split?: boolean }): void;
+  toThread(
+    threadId: string,
+    options?: {
+      split?: boolean;
+      /** Temporarily show only human input messages. Pass false to restore the full timeline. */
+      experimental_userMessagesOnly?: boolean;
+    },
+  ): void;
   toProject(projectId: string): void;
   /**
    * Navigate to one of this plugin's own nav panels by its `path`.

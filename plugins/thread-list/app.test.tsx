@@ -30,6 +30,7 @@ import {
   type PreferenceValues,
 } from "./shared/preferences.js";
 
+import { threadPinCommand } from "./app/pipeline/threadPinCommand.js";
 import { threadCompletionCommand } from "./app/pipeline/threadCompletionCommand.js";
 import { threadPipelineCommands } from "./app/pipeline/threadPipelineCommands.js";
 
@@ -211,6 +212,68 @@ describe("thread-list plugin", () => {
     });
   });
 
+  it.each([null, 1])(
+    "toggles the selected thread pin with P (pinnedAt: %s) and ignores editors",
+    async (pinnedAt) => {
+      setPreferencesMirrorStorageForTest(null);
+      const pin = vi.fn(sdkResult({ ok: true }));
+      const unpin = vi.fn(sdkResult({ ok: true }));
+      renderList(
+        {},
+        {
+          sdk: {
+            threads: {
+              get: vi.fn(
+                sdkResult(makeThreadResponse({ id: "thr_later", pinnedAt })),
+              ),
+              pin,
+              unpin,
+            },
+          },
+        },
+      );
+      await screen.findByText("Parent thread");
+      const context = {
+        threadId: "thr_parent",
+        projectId: "proj_app",
+        openPanel: () => false,
+      };
+      const selected = document.querySelector<HTMLAnchorElement>(
+        'a[data-sidebar-thread-id="thr_later"]',
+      )!;
+      selected.focus();
+      await waitFor(() =>
+        expect(threadPinCommand.isAvailable?.(context)).toBe(true),
+      );
+      fireEvent.keyDown(selected, { key: "p" });
+      await waitFor(() =>
+        expect(pinnedAt === null ? pin : unpin).toHaveBeenCalledOnce(),
+      );
+      expect(pinnedAt === null ? pin : unpin).toHaveBeenCalledExactlyOnceWith({
+        threadId: "thr_later",
+      });
+      expect(pinnedAt === null ? unpin : pin).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(selected);
+      for (const editor of [
+        document.createElement("input"),
+        document.createElement("textarea"),
+        document.createElement("div"),
+      ]) {
+        if (editor.tagName === "DIV") {
+          editor.setAttribute("contenteditable", "true");
+          editor.tabIndex = 0;
+        }
+        document.body.append(editor);
+        editor.focus();
+        expect(threadPinCommand.isAvailable?.(context)).toBe(false);
+        fireEvent.keyDown(editor, { key: "p" });
+        await act(async () => threadPinCommand.run(context));
+        editor.remove();
+      }
+      expect(pin.mock.calls.length + unpin.mock.calls.length).toBe(1);
+    },
+  );
+
   it.each(["chronological", "project", "machine"] as const)(
     "keeps Completed threads in their own section in %s view",
     async (organizationMode) => {
@@ -362,7 +425,10 @@ describe("thread-list plugin", () => {
     const { rpcCalls } = renderList({ organizationMode: "chronological" });
 
     await screen.findByText("Pinned thread");
-    expect(rpcCalls.map((call) => call.method)).toEqual(["listPreferences"]);
+    expect(rpcCalls.map((call) => call.method)).toEqual([
+      "listPreferences",
+      "backlogState",
+    ]);
     expect(sectionHeaders()).toEqual(["Pinned", "Later", "Review", "Threads"]);
     expect(threadIds()).toEqual([
       "thr_pinned",

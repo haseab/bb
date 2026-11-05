@@ -1014,3 +1014,7 @@ separately, within 8 MiB of patch output and a 1-second deadline per attempt.
 When it cannot finish, `mergeBase.squashMergeCheckComplete` is false and the
 counts may include already squash-merged commits; the next refresh retries with
 the cached work. Daemons older than this field report `true`.
+
+## In-memory Backlog preview
+
+Open the source dev frontend with `?preview=backlog` to preview Thread List using actual dev conversations. Badge-preview fixtures are hidden. Several real threads are placed into Completed, Active, Backlog, and the refreshed queue in browser memory. Follow-up triage, completion, pinning, archiving, and section moves stay in that tab. API writes outside these supported previews are blocked, including starting runs. Browser storage writes and the persisted sidebar snapshot are disabled. Refresh discards changes; removing the query parameter returns to normal dev behavior. This mode is unavailable in packaged builds and does not alter other tabs or the server database.

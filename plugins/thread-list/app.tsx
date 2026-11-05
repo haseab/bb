@@ -12,10 +12,21 @@ import {
   ThreadCompletionControls,
   threadCompletionCommand,
 } from "./app/pipeline/threadCompletionCommand.js";
+import {
+  ThreadPinControls,
+  threadPinCommand,
+} from "./app/pipeline/threadPinCommand.js";
 import { moveThreadAction } from "./app/rows/moveThreadAction.js";
 import { ThreadSelectionProvider } from "./app/selection/threadSelection.js";
 
 import { threadPipelineCommands } from "./app/pipeline/threadPipelineCommands.js";
+
+import { BacklogSync } from "./app/backlog/state.js";
+import {
+  BacklogTriage,
+  backlogTriageCommand,
+  followUpThreadAction,
+} from "./app/backlog/BacklogTriage.js";
 
 function ThreadList({
   activeThreadId,
@@ -27,7 +38,10 @@ function ThreadList({
     <CompactViewportOverrideProvider isCompactViewport={isCompactViewport}>
       <TooltipProvider>
         <PreferencesSync />
+        <BacklogSync />
+        <BacklogTriage />
         <ThreadCompletionControls />
+        <ThreadPinControls />
         <ThreadSelectionProvider activeThreadId={activeThreadId}>
           <ProjectList
             activeThreadId={activeThreadId}
@@ -41,6 +55,8 @@ function ThreadList({
 
 export default definePluginApp((app) => {
   app.commands.register(threadCompletionCommand);
+  app.commands.register(backlogTriageCommand);
+  app.commands.register(threadPinCommand);
   for (const command of threadPipelineCommands) app.commands.register(command);
   app.slots.experimental_threadList({
     id: "thread-list",
@@ -50,5 +66,6 @@ export default definePluginApp((app) => {
     component: ThreadList,
   });
   app.slots.experimental_threadAction(moveThreadAction);
+  app.slots.experimental_threadAction(followUpThreadAction);
   app.slots.experimental_threadAction(completeThreadAction);
 });

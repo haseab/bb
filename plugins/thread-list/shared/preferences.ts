@@ -131,6 +131,18 @@ export const preferenceDefinitions = {
     "List threads that show an unread dot above the rest, keeping the selected sort within each group. The open thread keeps its place until another thread is opened.",
     null,
   ),
+  backlogSectionId: definePreference(
+    listItemSchema.nullable(),
+    null,
+    "Backlog section for follow-up scheduling. null adopts the section named Backlog; a deleted configured section disables refresh until reconfigured.",
+    null,
+  ),
+  backlogRefreshDays: definePreference(
+    z.number().int().min(1).max(3650),
+    7,
+    "Default days before a newly backlogged thread returns below the refreshed queue divider. Explicit follow-up dates override this policy.",
+    null,
+  ),
   autoActiveSectionId: definePreference(
     listItemSchema.nullable(),
     null,
