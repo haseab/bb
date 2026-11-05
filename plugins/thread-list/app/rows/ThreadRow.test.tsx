@@ -48,6 +48,7 @@ import {
 } from "../list/customizeRowActionsContext.js";
 
 installTestPluginRuntime();
+const { quickDecisionsStateAtom } = await import("../decisions/state.js");
 const { SidebarDraftPresenceSync } =
   await import("../list/sidebarDraftPresence.js");
 const { ThreadRowNavigationProvider } =
@@ -1820,5 +1821,72 @@ describe("ThreadRow", () => {
     expect(
       await screen.findByRole("textbox", { name: "Thread name" }),
     ).toHaveProperty("value", "Thread");
+  });
+});
+
+describe("quick-decision dots", () => {
+  afterEach(() => {
+    getDefaultStore().set(quickDecisionsStateAtom, { items: [] });
+  });
+  function mark(
+    thread: PluginSidebarThread,
+    level: "instant" | "quick" = "instant",
+  ) {
+    getDefaultStore().set(quickDecisionsStateAtom, {
+      items: [
+        {
+          threadId: thread.id,
+          requestKey: `idle:${thread.latestAttentionAt}:request`,
+          interactionId: null,
+          classifiedAt: 1,
+          level,
+          reason: "Choose an export format",
+        },
+      ],
+    });
+  }
+  it("replaces the unread dot with red and keeps it after opening and reading", () => {
+    const thread = createThread();
+    mark(thread);
+    const slot = renderThreadRow({ thread });
+    expect(statusGlyph().getAttribute("data-decision-level")).toBe("instant");
+    expect(statusGlyph().style.backgroundColor).toBe("var(--destructive)");
+    slot.rerenderThreadRow(
+      { ...thread, isUnread: false, lastReadAt: thread.latestAttentionAt + 1 },
+      true,
+    );
+    expect(
+      screen.getByLabelText("Instant decision: Choose an export format"),
+    ).toBeTruthy();
+  });
+  it("uses a softer red for a quick decision and restores ordinary unread appearance when answered", async () => {
+    const thread = createThread();
+    mark(thread, "quick");
+    renderThreadRow({ thread });
+    expect(statusGlyph().style.backgroundColor).toContain("color-mix");
+    await act(async () => {
+      getDefaultStore().set(quickDecisionsStateAtom, { items: [] });
+    });
+    expect(renderedIndicators()).toEqual(["unread-success"]);
+  });
+  it("keeps errors and ongoing work ahead of decision dots", () => {
+    const thread = createThread({ status: "error" });
+    mark(thread);
+    const slot = renderThreadRow({ thread });
+    expect(renderedIndicators()).toEqual(["unread-error"]);
+    slot.rerenderThreadRow({
+      ...thread,
+      status: "active",
+      runtimeStatus: "active",
+    });
+    expect(renderedIndicators()).toEqual(["runtime"]);
+  });
+  it("keeps an outstanding decision visible while its thread is open in a split", () => {
+    const thread = createThread();
+    mark(thread);
+    renderSplitThreadRow({ thread });
+    expect(
+      screen.getByLabelText("Instant decision: Choose an export format"),
+    ).toBeTruthy();
   });
 });

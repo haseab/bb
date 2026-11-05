@@ -1,3 +1,4 @@
+import { restartAdmissionGate } from "../system/local-restart.js";
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import {
@@ -471,7 +472,22 @@ function rewindPrepareCommandFromStart(
   return { type: "thread.rewind.prepare", ...context, ...args };
 }
 
-export async function editThreadMessage(
+export function editThreadMessage(
+  deps: LoggedPendingInteractionWorkSessionDeps,
+  args: {
+    environment: Parameters<typeof requireReadyThreadEnvironment>[0];
+    payload: EditMessageRequest;
+    thread: Thread;
+  },
+): Promise<EditMessageResponse> {
+  return restartAdmissionGate(deps.db).run(async (allowed) => {
+    if (!allowed)
+      conflict("BB is preparing to restart. Retry the edit after it restarts.");
+    return editAdmittedThreadMessage(deps, args);
+  });
+}
+
+async function editAdmittedThreadMessage(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: {
     environment: Parameters<typeof requireReadyThreadEnvironment>[0];

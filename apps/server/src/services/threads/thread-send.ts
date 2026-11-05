@@ -1,3 +1,4 @@
+import { restartAdmissionGate } from "../system/local-restart.js";
 import { isNativeSessionActive } from "./native-session-sync.js";
 import {
   getEnvironment,
@@ -471,7 +472,22 @@ function appendAndQueueSendThreadMessageInTransaction({
   };
 }
 
-export async function sendThreadMessage(
+export function sendThreadMessage(
+  deps: LoggedPendingInteractionWorkSessionDeps,
+  args: SendThreadMessageArgs,
+): Promise<void> {
+  return restartAdmissionGate(deps.db).run(async (allowed) => {
+    if (!allowed)
+      throw new ApiError(
+        409,
+        "restart_pending",
+        "BB is preparing to restart. Try this command after it restarts.",
+      );
+    await sendAdmittedThreadMessage(deps, args);
+  });
+}
+
+async function sendAdmittedThreadMessage(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: SendThreadMessageArgs,
 ): Promise<void> {

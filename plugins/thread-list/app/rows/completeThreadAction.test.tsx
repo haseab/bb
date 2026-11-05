@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
 } from "@testing-library/react";
+import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PluginThreadActionTarget } from "@get-bb/plugin-sdk/app";
 import {
@@ -17,6 +19,10 @@ import {
   resetPreferencesSyncForTest,
   setPreferencesMirrorStorageForTest,
 } from "../preferences/preferences-sync.js";
+import {
+  ThreadCompletionControls,
+  threadCompletionCommand,
+} from "../pipeline/threadCompletionCommand.js";
 import { toast } from "sonner";
 import { makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { makeSidebarThread, sdkResult } from "../model/fixtures.js";
@@ -131,6 +137,241 @@ describe("Complete thread menu action", () => {
         }),
       );
       expect(pin).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["complete", "reopen", "failed", "last", "windowed"] as const)(
+    "opens the next chat only after successful completion: %s",
+    async (mode) => {
+      setPreferencesMirrorStorageForTest(null);
+      const current = makeSidebarThread({
+        id: "current",
+        sectionId: mode === "reopen" ? "sec_completed" : null,
+      });
+      const next = makeSidebarThread({ id: "next" });
+      let complete:
+        | ReturnType<typeof useThreadCompletion>["setCompleted"]
+        | undefined;
+      function CompletionProbe() {
+        const { setCompleted } = useThreadCompletion();
+        useEffect(() => {
+          complete = setCompleted;
+        }, [setCompleted]);
+        return (
+          <div data-sidebar="content">
+            <a href="#current" data-sidebar-thread-id="current">
+              Current
+            </a>
+            {mode === "windowed" ? (
+              <div data-sidebar-windowed-nav="next:proj_personal" />
+            ) : (
+              mode !== "last" && (
+                <a href="#next" data-sidebar-thread-id="next">
+                  Next
+                </a>
+              )
+            )}
+          </div>
+        );
+      }
+      let resolve: (() => void) | undefined;
+      const pending = new Promise<void>((done) => {
+        resolve = done;
+      });
+      const setCompleted = vi.fn(async () => {
+        await pending;
+        if (mode === "failed") throw new Error("offline");
+        return { threadId: "current", sectionId: "sec_completed" };
+      });
+      const view = renderSlot(
+        { component: CompletionProbe },
+        {},
+        {
+          sidebarThreads: {
+            threads: [current, next],
+            projects: [
+              {
+                id: current.projectId,
+                name: "Project",
+                href: "/",
+                settingsHref: "/",
+                isPersonal: false,
+              },
+            ],
+            sections: [],
+          },
+          sdk: {
+            threads: {
+              get: vi.fn(sdkResult(makeThreadResponse({ id: "current" }))),
+            },
+          },
+          rpc: {
+            listPreferences: () => ({
+              preferences: {
+                ...defaultPreferences(),
+                completedSectionId: "sec_completed",
+              },
+            }),
+            setCompleted,
+          },
+        },
+      );
+      await waitFor(() => expect(complete).toBeDefined());
+      await waitFor(() =>
+        expect(
+          view.inspection.rpcCalls.some(
+            (call) => call.method === "listPreferences",
+          ),
+        ).toBe(true),
+      );
+      let operation: Promise<void> | undefined;
+      await act(async () => {
+        operation = complete?.("current", mode !== "reopen");
+        operation?.catch(() => {});
+      });
+      await waitFor(() => expect(setCompleted).toHaveBeenCalledOnce());
+      expect(view.inspection.navigateCalls).toEqual([]);
+      await act(async () => {
+        resolve?.();
+        if (mode === "failed")
+          await expect(operation).rejects.toThrow("offline");
+        else await operation;
+      });
+      expect(view.inspection.navigateCalls).toEqual(
+        mode === "complete" || mode === "windowed"
+          ? [{ method: "toThread", threadId: "next" }]
+          : mode === "last"
+            ? [{ method: "toCompose" }]
+            : [],
+      );
+      if (mode === "windowed") {
+        const nextLink = document.createElement("a");
+        nextLink.href = "#next";
+        nextLink.dataset.sidebarThreadId = "next";
+        document.querySelector('[data-sidebar="content"]')?.append(nextLink);
+        await waitFor(() => expect(document.activeElement).toBe(nextLink));
+      }
+      if (mode === "complete")
+        expect(document.activeElement).toBe(
+          screen.getByRole("link", { name: "Next" }),
+        );
+    },
+  );
+
+  it.each(["restored", "remounted", "failed"] as const)(
+    "requests restoration of the original Command+Enter selector after Undo: %s",
+    async (mode) => {
+      setPreferencesMirrorStorageForTest(null);
+      const current = makeSidebarThread({ id: "current" });
+      const next = makeSidebarThread({ id: "next" });
+      function KeyboardProbe() {
+        return (
+          <>
+            <ThreadCompletionControls />
+            <div data-sidebar="content">
+              <a href="#current" data-sidebar-thread-id="current">
+                Current
+              </a>
+              <a href="#next" data-sidebar-thread-id="next">
+                Next
+              </a>
+            </div>
+          </>
+        );
+      }
+      let resolveUpdate: (() => void) | undefined;
+      let rejectUpdate: ((error: Error) => void) | undefined;
+      const pendingUpdate = new Promise<ReturnType<typeof makeThreadResponse>>(
+        (resolve, reject) => {
+          resolveUpdate = () => resolve(makeThreadResponse({ id: "current" }));
+          rejectUpdate = reject;
+        },
+      );
+      const update = vi.fn(() => pendingUpdate);
+      const view = renderSlot(
+        { component: KeyboardProbe },
+        {},
+        {
+          sidebarThreads: {
+            threads: [current, next],
+            projects: [
+              {
+                id: current.projectId,
+                name: "Project",
+                href: "/",
+                settingsHref: "/",
+                isPersonal: false,
+              },
+            ],
+            sections: [],
+          },
+          sdk: {
+            threads: {
+              get: vi.fn(sdkResult(makeThreadResponse({ id: "current" }))),
+              update,
+            },
+          },
+          rpc: {
+            listPreferences: () => ({ preferences: defaultPreferences() }),
+            setCompleted: () => ({
+              threadId: "current",
+              sectionId: "sec_completed",
+            }),
+          },
+        },
+      );
+      const context = {
+        threadId: "current",
+        projectId: current.projectId,
+        openPanel: () => false,
+      };
+      const original = screen.getByRole("link", { name: "Current" });
+      original.focus();
+      await waitFor(() =>
+        expect(threadCompletionCommand.isAvailable?.(context)).toBe(true),
+      );
+      await act(async () => threadCompletionCommand.run(context));
+      expect(document.activeElement).toBe(
+        screen.getByRole("link", { name: "Next" }),
+      );
+      const undo = vi.mocked(toast.success).mock.calls[0]?.[1]?.cancel;
+      if (!undo || typeof undo !== "object" || !("onClick" in undo))
+        throw new Error("Missing Undo");
+      render(<button onClick={undo.onClick}>Undo selector</button>);
+      fireEvent.click(screen.getByRole("button", { name: "Undo selector" }));
+      await waitFor(() => expect(update).toHaveBeenCalledOnce());
+      expect(document.activeElement).not.toBe(original);
+      if (mode === "remounted") {
+        const restored = document.createElement("a");
+        restored.setAttribute("href", "#current");
+        restored.dataset.sidebarThreadId = "current";
+        restored.textContent = "Current";
+        original.replaceWith(restored);
+      }
+      await act(async () => {
+        if (mode === "failed") rejectUpdate?.(new Error("offline"));
+        else resolveUpdate?.();
+      });
+      if (mode === "failed") {
+        await waitFor(() =>
+          expect(toast.error).toHaveBeenCalledWith(
+            "Failed to undo thread change.",
+          ),
+        );
+        expect(document.activeElement).not.toBe(original);
+      }
+      expect(view.inspection.navigateCalls).toEqual([
+        { method: "toThread", threadId: "next" },
+        ...(mode === "failed"
+          ? []
+          : [
+              {
+                method: "toThread",
+                threadId: "current",
+                options: { experimental_focusSidebar: true },
+              },
+            ]),
+      ]);
     },
   );
 

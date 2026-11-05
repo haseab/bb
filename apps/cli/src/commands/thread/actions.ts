@@ -756,6 +756,8 @@ export function describeQueueWait(row: {
 }): string {
   const waitingOn = row.waitingOn ?? { kind: "thread-busy" as const };
   switch (waitingOn.kind) {
+    case "restart":
+      return "waiting for BB to restart";
     case "time":
       return row.sendAt === null
         ? "scheduled"

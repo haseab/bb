@@ -4852,7 +4852,16 @@ export interface BbNavigate {
    * falls back to plain navigation where splits are off. Opening also expands
    * the thread's conversation if the side panel had collapsed it.
    */
-  toThread(threadId: string, options?: { split?: boolean }): void;
+  toThread(
+    threadId: string,
+    options?: {
+      split?: boolean;
+      /** Temporarily show only human input messages. Pass false to restore the full timeline. */
+      experimental_userMessagesOnly?: boolean;
+      /** Restore sidebar selection and keyboard focus, including when the thread row remounts. */
+      experimental_focusSidebar?: boolean;
+    },
+  ): void;
   toProject(projectId: string): void;
   /**
    * Navigate to one of this plugin's own nav panels by its `path`.
@@ -5168,6 +5177,8 @@ export interface PluginSdkApp {
     /** Defaults to active threads only. An empty selection also means active. */
     experimental_lifecycles: readonly ("active" | "archived")[];
   }): PluginSidebarThreadsState;
+  /** Open the host's project editor to inspect, attach or detach folders and rename a standard project. Personal is ignored. Core project and thread menus use the same editor. */
+  experimental_useProjectEditor(): (projectId: string) => void;
   /**
    * Thread actions bound to the host's mutations (see
    * {@link PluginSidebarThreadActions}). Experimental: see

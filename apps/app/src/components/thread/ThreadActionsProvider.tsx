@@ -9,7 +9,8 @@ import {
 } from "react";
 import { useLocation } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSetAtom } from "jotai";
+import { useSetAtom, useStore } from "jotai";
+import { sidebarThreadFocusRequestAtom } from "@/lib/sidebar-thread-focus";
 import { appToast } from "@/components/ui/app-toast";
 import {
   closePanesForThreadsAtom,
@@ -47,6 +48,7 @@ import {
   ThreadArchiveDialog,
   type ThreadArchiveDialogTarget,
 } from "@/components/dialogs/ThreadArchiveDialog";
+import { getSidebarThreadNavigationTargets } from "@/components/sidebar/sidebarThreadShortcuts";
 import { useArchiveUndo } from "./useArchiveUndo";
 import { ArchivedThreadToastDescription } from "@/components/thread/ArchivedThreadToastDescription";
 import { destroyPersistedBrowserViewsForThread } from "@/components/secondary-panel/browserViewVisibilityCoordinator";
@@ -105,6 +107,34 @@ interface ThreadActionContext {
 
 const ARCHIVE_UNDO_TOAST_DURATION_MS = 10_000;
 
+function archiveNavigationCandidates(threadId: string) {
+  const source = [
+    ...document.querySelectorAll<HTMLAnchorElement>(
+      "a[data-sidebar-thread-id]",
+    ),
+  ].find((link) => link.dataset.sidebarThreadId === threadId);
+  if (!source) return [];
+  const root =
+    source.closest<HTMLElement>('[data-sidebar="content"]') ?? document.body;
+  const targets = getSidebarThreadNavigationTargets(root);
+  const index = targets.findIndex((target) => target.threadId === threadId);
+  if (index === -1) return [];
+  return [
+    ...targets.slice(index + 1),
+    ...targets.slice(0, index).reverse(),
+  ].flatMap((target) => {
+    const href =
+      target.element?.getAttribute("href") ??
+      (target.projectId === null
+        ? null
+        : getThreadRoutePath({
+            projectId: target.projectId,
+            threadId: target.threadId,
+          }));
+    return href === null ? [] : [{ threadId: target.threadId, href }];
+  });
+}
+
 export function ThreadActionsProvider({
   children,
 }: ThreadActionsProviderProps) {
@@ -112,6 +142,7 @@ export function ThreadActionsProvider({
     useSystemConfig().data?.generalSettings.confirmThreadArchive ?? true;
   const navigate = useRouteNavigate();
   const registerArchiveUndo = useArchiveUndo();
+  const store = useStore();
   const queryClient = useQueryClient();
   const location = useLocation();
   const viewedRoute = `${location.pathname}${location.search}${location.hash}`;
@@ -137,7 +168,8 @@ export function ThreadActionsProvider({
   const threadActionContextAbortRef = useRef<AbortController | null>(null);
   const { mutateAsync: archiveThreadAndChildrenMutateAsync } =
     archiveThreadAndChildrenMutation;
-  const { mutate: unarchiveMutate } = unarchiveThreadMutation;
+  const { mutate: unarchiveMutate, mutateAsync: unarchiveMutateAsync } =
+    unarchiveThreadMutation;
   const { mutate: markReadMutate } = markThreadRead;
   const { mutate: markUnreadMutate } = markThreadUnread;
   const { mutate: pinMutate } = pinThread;
@@ -419,6 +451,7 @@ export function ThreadActionsProvider({
       closeDialog,
       thread,
     }: ArchiveThreadActionRequest) => {
+      const navigationCandidates = archiveNavigationCandidates(thread.id);
       archiveThreadAndChildrenMutateAsync({
         id: thread.id,
         childThreadsConfirmed,
@@ -426,23 +459,41 @@ export function ThreadActionsProvider({
         (response) => {
           closeDialog?.();
           const viewedThreadId = viewedThreadIdRef.current;
-          const archiveDisplacedThread = viewedThreadId === thread.id;
+          const archiveDisplacedThread =
+            viewedThreadId !== undefined &&
+            response.archivedThreadIds.includes(viewedThreadId);
+          const nextThread = navigationCandidates.find(
+            (candidate) =>
+              !response.archivedThreadIds.includes(candidate.threadId),
+          );
           const closeResult = closePanesForThreads(response.archivedThreadIds);
           const archiveDestination =
-            archiveDisplacedThread &&
+            nextThread?.href ??
+            (archiveDisplacedThread &&
             closeResult.removedAny &&
             closeResult.focusedRoute !== null
               ? getThreadRoutePath(closeResult.focusedRoute)
               : archiveDisplacedThread
                 ? getRootComposeRoutePath()
-                : null;
+                : null);
           const navigateAwayIfArchived = () => {
             const viewed = viewedThreadIdRef.current;
             if (viewed && response.archivedThreadIds.includes(viewed)) {
               navigate(getRootComposeRoutePath());
             }
           };
-          syncNavigationAfterClose(closeResult, navigateAwayIfArchived);
+          if (nextThread) {
+            navigate(nextThread.href);
+            const link = [
+              ...document.querySelectorAll<HTMLAnchorElement>(
+                "a[data-sidebar-thread-id]",
+              ),
+            ].find(
+              (element) =>
+                element.dataset.sidebarThreadId === nextThread.threadId,
+            );
+            link?.focus({ preventScroll: true });
+          } else syncNavigationAfterClose(closeResult, navigateAwayIfArchived);
           if (archiveDestination !== null) {
             viewedRouteRef.current = archiveDestination;
           }
@@ -469,19 +520,33 @@ export function ThreadActionsProvider({
                 const shouldReturnToThread =
                   archiveDestination !== null &&
                   viewedRouteRef.current === archiveDestination;
-                for (const threadId of [
-                  ...response.archivedThreadIds,
-                ].reverse()) {
-                  unarchiveMutate({ id: threadId });
-                }
-                if (shouldReturnToThread) {
-                  navigate(
-                    getThreadRoutePath({
-                      projectId: thread.projectId,
-                      threadId: thread.id,
-                    }),
-                  );
-                }
+                void (async () => {
+                  try {
+                    for (const threadId of [
+                      ...response.archivedThreadIds,
+                    ].reverse())
+                      await unarchiveMutateAsync({ id: threadId });
+                    if (
+                      shouldReturnToThread &&
+                      viewedRouteRef.current === archiveDestination
+                    ) {
+                      store.set(sidebarThreadFocusRequestAtom, {
+                        threadId: thread.id,
+                      });
+                      navigate(
+                        getThreadRoutePath({
+                          projectId: thread.projectId,
+                          threadId: thread.id,
+                        }),
+                      );
+                    }
+                  } catch (error) {
+                    showMutationErrorToast({
+                      error,
+                      fallbackMessage: "Failed to restore archived threads",
+                    });
+                  }
+                })();
               },
               ARCHIVE_UNDO_TOAST_DURATION_MS,
             ),
@@ -513,7 +578,8 @@ export function ThreadActionsProvider({
       closePanesForThreads,
       navigate,
       syncNavigationAfterClose,
-      unarchiveMutate,
+      unarchiveMutateAsync,
+      store,
     ],
   );
 

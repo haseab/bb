@@ -1,3 +1,4 @@
+import { restartAdmissionGate } from "../../src/services/system/local-restart.js";
 import {
   archiveThread,
   getAppSettings,
@@ -2130,5 +2131,97 @@ describe("turn held open for background work", () => {
       });
       expect(listQueuedThreadMessages(harness.db, thread.id)).toEqual([]);
     });
+  });
+});
+
+describe("restart dispatch hold", () => {
+  it("persists incoming messages, prevents Send now bypass, and resumes after release", async () => {
+    await withTestHarness(async (harness) => {
+      const { thread } = seedProviderThreadFixture({ harness, value: 981 });
+      const gate = restartAdmissionGate(harness.db);
+      const token = "54a75f01-5040-400a-8d65-d322faac83b5";
+      gate.control("acquire", token, 0);
+      const result = await acceptThreadSendRequest(harness.deps, {
+        thread,
+        payload: {
+          input: textInput("preserve this while restarting"),
+          mode: "start",
+        },
+      });
+      expect(result).toMatchObject({ delivery: "queued" });
+      const [queued] = listQueuedThreadMessages(harness.db, thread.id);
+      expect(queued).toMatchObject({
+        waitingOn: JSON.stringify({ kind: "restart" }),
+      });
+      await expect(
+        sendQueuedMessageNow(harness.deps, {
+          threadId: thread.id,
+          queuedMessageId: queued!.id,
+          mode: "auto",
+        }),
+      ).rejects.toMatchObject({
+        body: { code: "queued_message_still_waiting" },
+      });
+      expect(
+        listQueuedThreadCommands(harness, "turn.submit", thread.id),
+      ).toEqual([]);
+      expect(getQueuedThreadMessage(harness.db, queued!.id)).not.toBeNull();
+      await runQueuedMessageDispatch(harness.deps, {
+        kind: "idle-recovery",
+        now: Date.now(),
+      });
+      expect(
+        listQueuedThreadCommands(harness, "turn.submit", thread.id),
+      ).toEqual([]);
+      gate.control("release", token, 0);
+      await runQueuedMessageDispatch(harness.deps, {
+        kind: "idle-recovery",
+        now: Date.now(),
+      });
+      expect(
+        listQueuedThreadCommands(harness, "turn.submit", thread.id),
+      ).toHaveLength(1);
+      expect(getQueuedThreadMessage(harness.db, queued!.id)).toBeNull();
+    });
+  });
+});
+
+it("holds parent system notices with their taxonomy until restart admission resumes", async () => {
+  await withTestHarness(async (harness) => {
+    const { thread } = seedProviderThreadFixture({ harness, value: 982 });
+    const gate = restartAdmissionGate(harness.db);
+    const token = "54a75f01-5040-400a-8d65-d322faac83b5";
+    gate.control("acquire", token, 0);
+    await queueParentSystemMessage(harness.deps, {
+      parentThreadId: thread.id,
+      input: textInput("child finished during restart"),
+      systemMessageKind: "child-completed",
+      systemMessageSubject: null,
+    });
+    const [queued] = listQueuedThreadMessages(harness.db, thread.id);
+    expect(queued).toMatchObject({
+      waitingOn: JSON.stringify({ kind: "restart" }),
+    });
+    expect(queued!.systemNotice).toContain("child-completed");
+    expect(listQueuedThreadCommands(harness, "turn.submit", thread.id)).toEqual(
+      [],
+    );
+    await expect(
+      sendQueuedMessageNow(harness.deps, {
+        threadId: thread.id,
+        queuedMessageId: queued!.id,
+        mode: "auto",
+      }),
+    ).rejects.toMatchObject({ body: { code: "queued_message_still_waiting" } });
+    gate.control("release", token, 0);
+    await sendQueuedMessageNow(harness.deps, {
+      threadId: thread.id,
+      queuedMessageId: queued!.id,
+      mode: "auto",
+    });
+    expect(
+      listQueuedThreadCommands(harness, "turn.submit", thread.id),
+    ).toHaveLength(1);
+    expect(getQueuedThreadMessage(harness.db, queued!.id)).toBeNull();
   });
 });

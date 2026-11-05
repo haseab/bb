@@ -1,3 +1,5 @@
+import { decisionsRpcContract } from "./shared/decisions.js";
+import { createDecisionPolicy, decisionCommands } from "./decisions/policy.js";
 import {
   cliCommand,
   defineCli,
@@ -21,6 +23,9 @@ import {
   type PreferenceValues,
 } from "./shared/preferences.js";
 
+import { backlogRpcContract } from "./shared/backlog.js";
+import { createBacklogPolicy, backlogCommands } from "./backlog/policy.js";
+
 const PREFERENCE_KV_PREFIX = "preference:";
 const MIGRATION_KV_KEY = "migration:ui-preferences:v1";
 
@@ -37,6 +42,8 @@ const preferenceValuesSchema = z.object(
 );
 
 export const threadListRpcContract = defineRpcContract({
+  ...backlogRpcContract,
+  ...decisionsRpcContract,
   setCompleted: {
     input: z
       .object({ threadId: z.string().min(1), completed: z.boolean() })
@@ -192,23 +199,55 @@ export default async function threadListPlugin(bb: BbPluginApi) {
   const store = createPreferenceStore(bb);
 
   let sectionTransition = Promise.resolve();
+  function serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const result = sectionTransition.then(operation);
+    sectionTransition = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+  const backlog = createBacklogPolicy(bb, store);
+  const decisions = createDecisionPolicy(bb, store);
+  bb.background.schedule("backlog-refresh", "* * * * *", () =>
+    serialize(backlog.reconcile).then(() => {}),
+  );
+  bb.background.service("backlog-startup", {
+    async start(signal) {
+      await serialize(backlog.reconcile);
+      if (!signal.aborted)
+        await new Promise<void>((resolve) =>
+          signal.addEventListener("abort", () => resolve(), { once: true }),
+        );
+    },
+  });
+  bb.events.on("message.dispatched", ({ entry }) =>
+    serialize(() => backlog.markHot(entry.threadId)),
+  );
+  bb.events.on("message.queued", ({ entry }) =>
+    serialize(() => backlog.markHot(entry.threadId)),
+  );
   function setCompleted(threadId: string, completed: boolean) {
     const operation = sectionTransition.then(async () => {
       const thread = await bb.sdk.threads.get({ threadId });
       if (thread.archivedAt !== null || thread.deletedAt !== null)
         throw new Error("Unarchive the thread before changing completion.");
+      if (completed) decisions.clear(threadId);
       const sections = await bb.sdk.threadSections.list();
       const savedId = await store.read("completedSectionId");
-      let section = sections.find((candidate) => candidate.id === savedId);
+      let section =
+        sections.find((candidate) => candidate.id === savedId) ??
+        sections.find(
+          (candidate) => candidate.name.toLowerCase() === "completed",
+        );
       if (!completed) {
         if (!section || thread.sectionId !== section.id)
           return { threadId, sectionId: thread.sectionId };
+        if (savedId !== section.id)
+          await store.write("completedSectionId", section.id);
         await bb.sdk.threads.update({ threadId, sectionId: null });
         return { threadId, sectionId: null };
       }
-      section ??= sections.find(
-        (candidate) => candidate.name.toLowerCase() === "completed",
-      );
       section ??= await bb.sdk.threadSections.create({ name: "Completed" });
       if (savedId !== section.id)
         await store.write("completedSectionId", section.id);
@@ -231,13 +270,16 @@ export default async function threadListPlugin(bb: BbPluginApi) {
   bb.events.on("thread.active", ({ thread: eventThread }) => {
     sectionTransition = sectionTransition
       .then(async () => {
+        await backlog.markHot(eventThread.id);
         const preferences = await store.readAll();
         const sectionId = preferences.autoActiveSectionId;
         if (sectionId === null) return;
         const thread = await bb.sdk.threads.get({ threadId: eventThread.id });
         if (
           thread.status !== "active" ||
-          thread.sectionId !== null ||
+          (thread.sectionId !== null &&
+            thread.sectionId !== preferences.completedSectionId) ||
+          thread.sectionId === sectionId ||
           thread.parentThreadId !== null ||
           thread.pinnedAt !== null ||
           thread.archivedAt !== null ||
@@ -259,7 +301,7 @@ export default async function threadListPlugin(bb: BbPluginApi) {
       })
       .catch((error: unknown) => {
         bb.log.warn(
-          `could not move a running queued thread to Active: ${error instanceof Error ? error.message : String(error)}`,
+          `could not move a running queued or completed thread to Active: ${error instanceof Error ? error.message : String(error)}`,
         );
       });
     return sectionTransition;
@@ -300,6 +342,15 @@ export default async function threadListPlugin(bb: BbPluginApi) {
   });
 
   bb.rpc.register(threadListRpcContract, {
+    decisionsState: () => decisions.snapshot(),
+    refreshDecision: async ({ threadId }) => {
+      await decisions.analyze(threadId, undefined, true);
+      return decisions.snapshot();
+    },
+    backlogState: () => serialize(backlog.reconcile),
+    scheduleFollowUp: ({ threadId, input, timeZone, onlyBacklog }) =>
+      serialize(() => backlog.schedule(threadId, input, timeZone, onlyBacklog)),
+    clearFollowUp: ({ threadId }) => serialize(() => backlog.clear(threadId)),
     async setCompleted({ threadId, completed }) {
       return setCompleted(threadId, completed);
     },
@@ -322,6 +373,8 @@ export default async function threadListPlugin(bb: BbPluginApi) {
       description:
         "Organization mode, sort, section order, hidden groups, and collapsed groups for bb's sidebar thread list. Values are JSON; a bare word is read as a string.",
       commands: {
+        ...backlogCommands(backlog, serialize),
+        ...decisionCommands(decisions),
         complete: cliCommand({
           summary:
             "Complete a thread and move it to Completed without archiving",

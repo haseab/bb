@@ -125,16 +125,34 @@ export const preferenceDefinitions = {
     "Whether sibling threads sharing a worktree collapse into one row. auto groups them in every organization except chronological.",
     "sidebar.threadGrouping.environment",
   ),
+  quickDecisions: definePreference(
+    z.boolean(),
+    true,
+    "Use the existing Codex login to classify new decision requests, tint their dots red, and promote quick decisions in Queued. No history backfill.",
+    null,
+  ),
   groupByReadStatus: definePreference(
     z.boolean(),
     false,
     "List threads that show an unread dot above the rest, keeping the selected sort within each group. The open thread keeps its place until another thread is opened.",
     null,
   ),
+  backlogSectionId: definePreference(
+    listItemSchema.nullable(),
+    null,
+    "Backlog section for follow-up scheduling. null adopts the section named Backlog; a deleted configured section disables refresh until reconfigured.",
+    null,
+  ),
+  backlogRefreshDays: definePreference(
+    z.number().int().min(1).max(3650),
+    7,
+    "Default days before a newly backlogged thread returns below the refreshed queue divider. Explicit follow-up dates override this policy.",
+    null,
+  ),
   autoActiveSectionId: definePreference(
     listItemSchema.nullable(),
     null,
-    "Move unsectioned queued root threads to this section when they become active, at the top of manual order, and return idle threads in this section to the queue. Other sections are preserved. null disables this rule.",
+    "Move unsectioned queued and completed root threads to this section when they become active, at the top of manual order, and return idle threads in this section to the queue. Other sections are preserved. null disables this rule.",
     null,
   ),
   manualThreadOrder: definePreference(

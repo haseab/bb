@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
+import { getDefaultStore } from "jotai";
+import { sidebarThreadFocusRequestAtom } from "@/lib/sidebar-thread-focus";
+
 import type { ReactNode } from "react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -168,6 +172,7 @@ function renderProvider(children: ReactNode) {
 let queryClient: QueryClient;
 
 beforeEach(() => {
+  getDefaultStore().set(sidebarThreadFocusRequestAtom, null);
   mocks.confirmThreadArchive = true;
   mocks.pathname = "/";
   mocks.viewedThreadId = undefined;
@@ -423,6 +428,121 @@ describe("ThreadActionsProvider archive confirmation", () => {
   });
 });
 
+describe("ThreadActionsProvider archive navigation", () => {
+  it.each(["next", "previous", "windowed", "failed"] as const)(
+    "opens the next surviving sidebar row after archive succeeds: %s",
+    async (mode) => {
+      mocks.confirmThreadArchive = false;
+      const thread = makeThread();
+      mocks.viewedThreadId = thread.id;
+      mocks.pathname = `/projects/${thread.projectId}/threads/${thread.id}`;
+      let resolveArchive:
+        | ((response: { ok: true; archivedThreadIds: string[] }) => void)
+        | undefined;
+      let rejectArchive: ((error: Error) => void) | undefined;
+      vi.mocked(sdk.threads.archiveAll).mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            resolveArchive = resolve;
+            rejectArchive = reject;
+          }),
+      );
+      renderProvider(
+        <>
+          <div data-sidebar="content">
+            <a
+              href="/projects/previous/threads/before"
+              data-sidebar-thread-id="before"
+              data-sidebar-thread-shortcut-target=""
+            >
+              Before
+            </a>
+            <a
+              href={mocks.pathname}
+              data-sidebar-thread-id={thread.id}
+              data-sidebar-thread-shortcut-target=""
+            >
+              Current
+            </a>
+            <a
+              href="/projects/child/threads/thr_child"
+              data-sidebar-thread-id="thr_child"
+              data-sidebar-thread-shortcut-target=""
+            >
+              Child
+            </a>
+            {mode === "windowed" ? (
+              <div data-sidebar-windowed-nav="after:next" />
+            ) : (
+              mode !== "previous" && (
+                <a
+                  href="/projects/next/threads/after"
+                  data-sidebar-thread-id="after"
+                  data-sidebar-thread-shortcut-target=""
+                >
+                  After
+                </a>
+              )
+            )}
+          </div>
+          <ArchiveButton thread={thread} />
+        </>,
+      );
+      for (const element of document.querySelectorAll(
+        "[data-sidebar-thread-shortcut-target], [data-sidebar-windowed-nav]",
+      )) {
+        Object.defineProperty(element, "checkVisibility", {
+          value: () => true,
+        });
+      }
+      fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+      await vi.waitFor(() =>
+        expect(sdk.threads.archiveAll).toHaveBeenCalledOnce(),
+      );
+      expect(mocks.navigate).not.toHaveBeenCalled();
+      screen.getByRole("link", { name: "Current" }).remove();
+      if (mode === "failed") rejectArchive?.(new Error("offline"));
+      else
+        resolveArchive?.({
+          ok: true,
+          archivedThreadIds: ["thr_child", thread.id],
+        });
+      await vi.waitFor(() =>
+        expect(
+          mode === "failed" ? appToast.error : appToast.success,
+        ).toHaveBeenCalledOnce(),
+      );
+      if (mode === "failed") {
+        expect(mocks.navigate).not.toHaveBeenCalled();
+        return;
+      }
+      const destination =
+        mode === "previous"
+          ? "/projects/previous/threads/before"
+          : "/projects/next/threads/after";
+      expect(mocks.navigate).toHaveBeenCalledExactlyOnceWith(destination);
+      if (mode !== "windowed")
+        expect(document.activeElement).toBe(
+          screen.getByRole("link", {
+            name: mode === "previous" ? "Before" : "After",
+          }),
+        );
+      const undo = vi.mocked(appToast.success).mock.calls[0]?.[1]?.cancel;
+      if (!undo) throw new Error("Expected archive Undo");
+      render(<button onClick={undo.onClick}>Undo next-thread archive</button>);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Undo next-thread archive" }),
+      );
+      await vi.waitFor(() =>
+        expect(mocks.navigate).toHaveBeenLastCalledWith(mocks.pathname),
+      );
+      expect(getDefaultStore().get(sidebarThreadFocusRequestAtom)).toEqual({
+        threadId: thread.id,
+      });
+    },
+  );
+});
+
 describe("ThreadActionsProvider archive feedback", () => {
   it("offers the shared Undo toast for a group and restores its parent before descendants", async () => {
     vi.mocked(sdk.environments.archiveThreads).mockResolvedValue({
@@ -547,10 +667,69 @@ describe("ThreadActionsProvider archive feedback", () => {
     render(<button onClick={undoAction.onClick}>Run undo</button>);
     fireEvent.click(screen.getByRole("button", { name: "Run undo" }));
 
-    expect(mocks.navigate).toHaveBeenLastCalledWith(
-      `/projects/${thread.projectId}/threads/${thread.id}`,
+    await vi.waitFor(() =>
+      expect(mocks.navigate).toHaveBeenLastCalledWith(
+        `/projects/${thread.projectId}/threads/${thread.id}`,
+      ),
     );
+    expect(getDefaultStore().get(sidebarThreadFocusRequestAtom)).toEqual({
+      threadId: thread.id,
+    });
   });
+
+  it.each(["restored", "failed"] as const)(
+    "waits for unarchive before restoring Undo selection: %s",
+    async (mode) => {
+      const thread = makeThread();
+      mocks.confirmThreadArchive = false;
+      mocks.pathname = `/projects/${thread.projectId}/threads/${thread.id}`;
+      mocks.viewedThreadId = thread.id;
+      vi.mocked(sdk.threads.archiveAll).mockResolvedValue({
+        ok: true,
+        archivedThreadIds: [thread.id],
+      });
+      let resolveRestore: (() => void) | undefined;
+      let rejectRestore: ((error: Error) => void) | undefined;
+      vi.mocked(sdk.threads.unarchive).mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            resolveRestore = () => resolve({ ok: true });
+            rejectRestore = reject;
+          }),
+      );
+      renderProvider(<ArchiveButton thread={thread} />);
+      fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+      await vi.waitFor(() => expect(appToast.success).toHaveBeenCalledOnce());
+      const undo = vi.mocked(appToast.success).mock.calls[0]?.[1]?.cancel;
+      if (!undo) throw new Error("Expected archive Undo");
+      fireEvent.click(
+        render(
+          <button onClick={undo.onClick}>Undo delayed restore</button>,
+        ).getByRole("button", { name: "Undo delayed restore" }),
+      );
+      await vi.waitFor(() =>
+        expect(sdk.threads.unarchive).toHaveBeenCalledOnce(),
+      );
+      expect(getDefaultStore().get(sidebarThreadFocusRequestAtom)).toBeNull();
+      expect(mocks.navigate).toHaveBeenCalledExactlyOnceWith("/");
+      await act(async () => {
+        if (mode === "failed") rejectRestore?.(new Error("offline"));
+        else resolveRestore?.();
+      });
+      if (mode === "failed") {
+        expect(getDefaultStore().get(sidebarThreadFocusRequestAtom)).toBeNull();
+        expect(mocks.navigate).toHaveBeenCalledOnce();
+        expect(appToast.error).toHaveBeenCalled();
+      } else {
+        await vi.waitFor(() =>
+          expect(getDefaultStore().get(sidebarThreadFocusRequestAtom)).toEqual({
+            threadId: thread.id,
+          }),
+        );
+        expect(mocks.navigate).toHaveBeenLastCalledWith(mocks.pathname);
+      }
+    },
+  );
 
   it("does not return to the thread when the user navigated after archiving", async () => {
     const thread = makeThread();

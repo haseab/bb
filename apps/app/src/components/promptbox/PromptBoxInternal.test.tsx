@@ -1415,6 +1415,36 @@ describe("ComposerBox controlled value sync", () => {
     }
   });
 
+  it("preserves sidebar thread focus during passive autofocus and permits explicit composer focus", async () => {
+    const restoreMatchMedia = mockPointerCoarse(false);
+    const link = document.createElement("a");
+    link.href = "#selected-thread";
+    link.setAttribute("data-sidebar-thread-id", "selected-thread");
+    document.body.append(link);
+    try {
+      const promptBoxRef = createRef<PromptBoxHandle>();
+      const props = createPromptBoxProps({ autoFocus: false, promptBoxRef });
+      const view = render(<ComposerBox {...props} />);
+      await waitFor(() =>
+        expect(getPromptEditorElement()).toBeInstanceOf(HTMLElement),
+      );
+      link.focus();
+      view.rerender(<ComposerBox {...props} autoFocus />);
+      await act(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => resolve()),
+          ),
+      );
+      expect(document.activeElement).toBe(link);
+      act(() => promptBoxRef.current?.focusEnd());
+      await waitForPromptFocus();
+    } finally {
+      link.remove();
+      restoreMatchMedia();
+    }
+  });
+
   it("releases passive editor focus when autofocus becomes blocked", async () => {
     const restoreMatchMedia = mockPointerCoarse(false);
     try {

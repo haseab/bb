@@ -216,7 +216,11 @@ function twoPaneLayout(focusedPaneId: string): SplitLayout {
         {
           type: "pane",
           paneId: "pane_other",
-          content: { kind: "thread", projectId: "proj_a", threadId: "thr_other" },
+          content: {
+            kind: "thread",
+            projectId: "proj_a",
+            threadId: "thr_other",
+          },
         },
         {
           type: "pane",
@@ -364,6 +368,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Move to section",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -381,6 +386,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Move to section",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -411,6 +417,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "Mark read",
         "---",
         "Rename",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -426,6 +433,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "Mark read",
         "---",
         "Rename",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -451,6 +459,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Move to section",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -468,6 +477,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Move to section",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -491,6 +501,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Move to section",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -508,6 +519,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Move to section",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -533,6 +545,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Move to section",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -550,6 +563,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "---",
         "Rename",
         "Move to section",
+        "Edit project…",
         "---",
         "Customize actions",
         "---",
@@ -562,7 +576,11 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
   ])(
     "lists the items for $state",
     async ({ thread, route, layout, desktop, compact }) => {
-      renderSurface(surface, { thread, inline: [CUSTOMIZE] }, { route, layout });
+      renderSurface(
+        surface,
+        { thread, inline: [CUSTOMIZE] },
+        { route, layout },
+      );
       await surface.open();
       expect(await menuRows()).toEqual(surface.compact ? compact : desktop);
     },
@@ -650,9 +668,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
     );
 
     await surface.open();
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Copy link" }),
-    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Copy link" }));
     expect(copyToClipboardWithToast).toHaveBeenCalledWith(
       `${window.location.origin}/projects/proj_a/threads/thr_target`,
       {
@@ -809,6 +825,7 @@ describe("thread action registrations", () => {
       "bb--core/read",
       "bb--core/rename",
       "fixture/move",
+      "bb--core/editProject",
       "bb--core/archive",
       "bb--core/delete",
       "fixture/notify",

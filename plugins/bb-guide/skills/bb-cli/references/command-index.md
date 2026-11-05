@@ -347,3 +347,13 @@ This index lists every command path that the core CLI registers, including alias
 - `bb browser watch`
 - `bb browser import-sources`
 - `bb browser import-cookies`
+
+## restart
+
+- `bb restart`
+- `bb restart start`
+- `bb restart status`
+- `bb restart cancel`
+- `bb restart now`
+
+Source-based macOS restarts; see `bb guide customization`.

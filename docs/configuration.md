@@ -1114,6 +1114,7 @@ row's Customize actions, or `bb thread-list prefs get|set|reset <key>`
 | --------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `organizationMode`    | `chronological`                   | `project`, `chronological` (Custom), or `machine`                                                                                           |
 | `environmentGrouping` | `auto`                            | `true` collapses sibling threads sharing a worktree into one row, `false` never does, `auto` groups except in `chronological`               |
+| `quickDecisions`      | `true`                            | Uses Codex sign-in for red decision dots and priority ordering in the unsectioned queue; no history backfill.                               |
 | `groupByReadStatus`   | `false`                           | Lists unread threads above the rest; exclusive with environment grouping                                                                    |
 | `chronologicalSort`   | `updated`                         | Sort field for `chronological`                                                                                                              |
 | `sortDirection`       | `default`                         | `default`, `ascending`, or `descending`                                                                                                     |
@@ -1162,6 +1163,27 @@ read-status grouping so the promoted thread is at the top. Already sectioned
 threads retain their placement; completion remains manual. A deleted destination
 is ignored. Use `bb thread-list prefs set autoActiveSectionId <section-id>` or the
 plugin's `setPreference` RPC to configure it.
+
+Backlog follow-ups are owned by the Thread list plugin. `backlogSectionId`
+(default `null`) adopts the section named Backlog on first reconciliation;
+a configured but deleted section pauses refresh until reconfigured.
+`backlogRefreshDays` (default `7`, range 1–3650) gives newly backlogged root
+threads an implicit return deadline. Existing Backlog roots receive their first
+countdown when the policy first sees them. Explicit follow-up dates override
+that default. Change these through `bb thread-list prefs set` or `setPreference`.
+
+Command/Control+E (`plugin:thread-list/triage-backlog`) walks only unscheduled
+Backlog roots, with a natural-language date field and local-time preview.
+`7d`, `7 days`, `61 min`, and `Sep 1` are accepted; date-only inputs use 9am and
+past dates are rejected. Follow up… in a thread menu can also schedule a Queued
+or Active thread by moving it into Backlog. The server sweeps every minute and
+at startup. Due idle roots return below a Refreshed divider at the bottom of
+Queued; opening one keeps it refreshed, while messaging/running it makes it hot.
+Manual moves, pins, archives, and deletions invalidate stale deadlines.
+The plugin database persists deadlines and refreshed state across restarts.
+Use `bb thread-list backlog list|schedule|clear` or the `backlogState`,
+`scheduleFollowUp`, and `clearFollowUp` plugin RPCs for equivalent automation.
+The Thread list skill documents their inputs and timezone behavior.
 
 `rowActions` keys are `bb--core/<id>` (`split`, `newThreadInEnvironment`,
 `copyLink`, `read`, `pin`, `rename`, `archive`, `delete`), `thread-list/move`,
@@ -1379,3 +1401,25 @@ and workspace access. They follow each folder's local instructions when working
 there. Project-default threads use a managed directory when the selected machine
 has zero or multiple folders; a single folder retains the checkout/worktree default.
 Choose Project workspace explicitly to use a managed directory with any folder count.
+
+Project and thread context menus expose **Edit project…** to inspect attached
+folders without leaving the conversation. The editor shows full paths and
+machine names, supports adding further folders and detaching existing ones,
+and can save a new project name. Folder changes save immediately; detaching a
+folder keeps files and threads. The same source management remains available
+in Settings → Projects → Folders and through `bb project source add|delete`.
+
+### Local source desktop restart state
+
+The macOS source coordinator (`pnpm desktop:restart`, or `bb restart start
+--checkout <path>`) keeps job metadata in `~/.bb/restart/state.json`, its build
+log in `~/.bb/restart/build.log`, explicit cancellation/force requests in
+`command.json`, and a single-worker `lock/` directory. These are coordinator
+state, not settings to edit by hand. The installed app remains open during
+packaging; new sends queue once the verified build is waiting for idle. A
+renewable two-minute admission lease prevents a dead coordinator from holding
+dispatch forever. Use the status/cancel/now commands or the app's pending-restart
+controls. This is separate from release auto-updates and uses `/Applications/bb.app`
+with the existing `~/.bb` data; rollback replaces the application bundle, not the
+database. See `docs/debugging-and-qa.md` for recovery paths and first-upgrade
+behavior when the installed runtime has no admission endpoint.

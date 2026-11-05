@@ -1,3 +1,7 @@
+import type {
+  LocalRestartStatus,
+  LocalRestartCommand,
+} from "@bb/server-contract";
 import { mobileAppDownloads } from "@bb/domain";
 import type {
   MachineEnvironmentReplace,
@@ -210,6 +214,8 @@ export interface SystemArea {
   ): Promise<SystemProviderStatesResult>;
   usageLimits(args?: SystemUsageLimitsArgs): Promise<SystemUsageLimitsResult>;
   version(args?: SystemVersionArgs): Promise<SystemVersionResult>;
+  localRestart(): Promise<LocalRestartStatus>;
+  controlLocalRestart(input: LocalRestartCommand): Promise<LocalRestartStatus>;
   appUpdate(args?: SystemAppUpdateArgs): Promise<SystemAppUpdateStatusResult>;
   applyAppUpdate(
     args: SystemApplyAppUpdateArgs,
@@ -437,6 +443,16 @@ export function createSystemArea(args: CreateSdkAreaArgs): SystemArea {
           { query: versionQuery(input) },
           ...signalRequestArgs(input?.signal),
         ),
+      );
+    },
+    async localRestart() {
+      return transport.readJson(
+        transport.api.v1.system["local-restart"].$get(),
+      );
+    },
+    async controlLocalRestart(input) {
+      return transport.readJson(
+        transport.api.v1.system["local-restart"].$post({ json: input }),
       );
     },
     async appUpdate(input) {

@@ -3,7 +3,7 @@ import {
   ActionMenuItem,
   ActionMenuSeparator,
 } from "@bb/shared-ui/action-menu-items";
-import { findLocalPathProjectSourceForHost } from "@bb/domain";
+import { useProjectEditor } from "@/lib/project-editor";
 import type { ProjectResponse } from "@bb/server-contract";
 import type { MouseEvent, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -47,16 +47,22 @@ export function ProjectActionsMenuItems({
   onRename,
   extraActions,
 }: ProjectActionsMenuItemsProps) {
+  const editProject = useProjectEditor();
   const navigate = useNavigate();
   const { hostId: pickerHostId } = usePathPickerHost();
   const { requestRename, requestDelete, requestAddLocalPath } =
     useProjectActions();
-  const showAddLocalPath =
-    pickerHostId != null &&
-    !findLocalPathProjectSourceForHost(project.sources, pickerHostId);
+  const showAddLocalPath = pickerHostId != null;
 
   return (
     <>
+      <ActionMenuItem
+        surface={surface}
+        icon="Folder"
+        onSelect={() => editProject(project.id)}
+      >
+        Edit project…
+      </ActionMenuItem>
       <ActionMenuItem
         surface={surface}
         icon="Settings"
@@ -84,7 +90,7 @@ export function ProjectActionsMenuItems({
             requestAddLocalPath(project);
           }}
         >
-          Add local path
+          Add folder
         </ActionMenuItem>
       ) : null}
       {extraActions?.(surface)}

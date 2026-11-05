@@ -1,3 +1,4 @@
+import { restartAdmissionGate } from "../system/local-restart.js";
 import { requestQueuedMachineReadiness } from "./queued-message-dispatch.js";
 import {
   cancelPreparingMachinePause,
@@ -300,13 +301,16 @@ export function attemptDispatch(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: DispatchAttemptArgs,
 ): Promise<DispatchAttemptOutcome> {
-  return runDispatchAttempt(deps, args, false);
+  return restartAdmissionGate(deps.db).run((allowed) =>
+    runDispatchAttempt(deps, args, false, allowed),
+  );
 }
 
 async function runDispatchAttempt(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: DispatchAttemptArgs,
   reattempted: boolean,
+  restartAllowed = true,
 ): Promise<DispatchAttemptOutcome> {
   const { thread } = args;
   let { payload } = args;
@@ -375,7 +379,7 @@ async function runDispatchAttempt(
     payload,
     args.executionDefaults ?? { threadId: thread.id },
   );
-  if (payload.compactFirst) {
+  if (payload.compactFirst && restartAllowed) {
     const { compactFirst, ...request } = payload;
     await compactThreadContext(deps, thread);
     payload = request;
@@ -412,6 +416,8 @@ async function runDispatchAttempt(
     }
     return { kind: "queued", entry };
   };
+
+  if (!restartAllowed) return waitOn({ kind: "restart" }, null);
 
   // --- 1. plugin policy ---------------------------------------------------
 

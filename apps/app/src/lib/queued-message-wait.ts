@@ -32,6 +32,7 @@ export function isQueuedMessageSendNowAllowed({
   if (failureReason !== null) return true;
   if (waitingOn === null) return true;
   switch (waitingOn.kind) {
+    case "restart":
     case "provisioning":
     case "host-offline":
     case "interaction":
@@ -68,6 +69,7 @@ export function queuedMessageWaitIcon(args: {
   switch (args.waitingOn.kind) {
     case "thread-busy":
       return null;
+    case "restart":
     case "stopping":
     case "turn-starting":
       return "TimeSchedule";
@@ -129,6 +131,8 @@ export function describeQueuedMessageWait(
   if (!queuedMessageHasWaitLine(args)) return null;
   if (args.waitingOn === null) return null;
   switch (args.waitingOn.kind) {
+    case "restart":
+      return "Sending after BB restarts";
     case "thread-busy":
       return null;
     case "turn-starting":

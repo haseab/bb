@@ -46,6 +46,26 @@ describe("composer Markdown editing", () => {
   });
 
   it.each([
+    "**`optimistic-invited-source`** — Makes the guest directory’s invitation-source cell update immediately when saved, without refreshing the directory. Restores the editor and draft on failure and retains safe retry behavior. The changes are **uncommitted**.",
+    "_`inline code`_ after",
+    "~~`inline code`~~ after",
+    "[`inline code`](https://example.com) after",
+  ])(
+    "pastes nested inline code formatting without rejecting the content: %s",
+    (text) => {
+      const editor = createEditor();
+      const content = promptEditorContentFromValue({ text, mentions: [] });
+      expect(editor.commands.insertContent(content.content ?? [])).toBe(true);
+      expect(editor.state.doc.textContent).toContain(
+        text.includes("optimistic")
+          ? "optimistic-invited-source"
+          : "inline code",
+      );
+      expect(promptEditorValueFromDoc(editor.state.doc).text).toBe(text);
+    },
+  );
+
+  it.each([
     ["**bold**", "strong", "bold"],
     ["_italic_", "em", "italic"],
     ["~~removed~~", "s", "removed"],

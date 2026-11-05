@@ -16,6 +16,16 @@ import { applyCachedAppThemeCss } from "./lib/themes";
 import { installStaleChunkRecovery } from "./lib/stale-chunk-recovery";
 import "./app.css";
 
+if (import.meta.env.DEV) {
+  const { installInMemoryThreadPreview } =
+    await import("./lib/in-memory-thread-preview");
+  const { sidebarNavigationQueryKey } =
+    await import("./hooks/queries/query-keys");
+  installInMemoryThreadPreview((data) =>
+    appQueryClient.setQueryData(sidebarNavigationQueryKey(), data),
+  );
+}
+
 installStaleChunkRecovery();
 installForeignDomMutationGuard();
 

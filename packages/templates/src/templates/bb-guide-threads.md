@@ -196,3 +196,5 @@ Lifecycle ownership:
   dependents; deleting it deletes them. Unarchive the owner before explicitly
   restoring a dependent. Stop does not cascade. Sidebar parents and ordinary
   forks keep their own policies.
+
+Use `bb thread log <id> --user-messages --all` to peek at only your input messages. `--json` returns conversation rows for this view. Assistant, agent and system messages are excluded. This flag cannot be combined with `--message` or `--after-seq`.

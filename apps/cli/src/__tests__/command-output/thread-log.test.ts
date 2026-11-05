@@ -15,6 +15,53 @@ describe("bb thread log command output", () => {
   const register: CommandRegistrar = (program) =>
     registerThreadCommands(program, () => "http://server");
 
+  it.each([false, true])(
+    "bb thread log --user-messages excludes assistant and agent messages (json=%s)",
+    async (json) => {
+      const own = fixtures.makePendingSteerTimelineRow();
+      const getTimeline = vi.fn(async () =>
+        fixtures.makeTimelineResponse([
+          own,
+          {
+            ...own,
+            id: "agent",
+            initiator: "agent",
+            senderThreadId: "other-thread",
+            text: "Agent text",
+          },
+          {
+            ...own,
+            id: "assistant",
+            role: "assistant",
+            turnRequest: null,
+            text: "Assistant text",
+          },
+        ]),
+      );
+      stubServerApi({ "v1.threads.:id.timeline.$get": getTimeline });
+      await runCommand(
+        [
+          "thread",
+          "log",
+          "thread-log",
+          "--user-messages",
+          "--all",
+          ...(json ? ["--json"] : []),
+        ],
+        register,
+      );
+      const output = String(vi.mocked(console.log).mock.calls[0]?.[0]);
+      expect(output).toContain(own.text);
+      expect(output).not.toContain("Agent text");
+      expect(output).not.toContain("Assistant text");
+      if (json) expect(JSON.parse(output)).toEqual([own]);
+      expect(getTimeline).toHaveBeenCalledWith({
+        param: { id: "thread-log" },
+        query: { includeNestedRows: "true", segmentLimit: "100" },
+      });
+    },
+  );
+
   it("bb thread log renders pending steers for human output", async () => {
     const getEvents = vi.fn(async () => []);
     const getTimeline = vi.fn(async () =>

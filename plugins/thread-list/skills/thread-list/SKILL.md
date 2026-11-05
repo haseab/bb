@@ -7,12 +7,22 @@ description: "Inspect or change the sidebar thread list's layout preferences: or
 
 ## Complete and reopen threads
 
-Choose Complete from a thread's three-dot menu, or press Command+Enter
-(Control+Enter on other platforms) while the sidebar selector is on that thread.
+Press Command+Enter (Control+Enter on other platforms) on a selected thread to
+toggle completion. A thread in Completed returns to Queued and keeps the
+selector; other threads move into Completed. The three-dot menu also offers
+Complete or Reopen.
 The command is `plugin:thread-list/complete` and can be rebound in Settings →
 Keyboard. It only acts on the focused sidebar row, leaving composer submission
 unchanged. Completed rows offer Reopen to return to the unsectioned queue.
 The default row quick action is Complete; Archive remains a separate menu action.
+Completing a sidebar thread opens the next visible thread below it, skipping
+children that move with the completed parent and threads already in Completed.
+At the bottom it opens the previous remaining thread, or the new-thread screen
+when none remain. Reopening with the selector keeps that thread open and
+focused in Queued. Navigation happens
+after completion succeeds; Undo restores placement without switching chats.
+When completion started from the focused sidebar selector (including
+Command/Control+Enter), Undo also returns that selector to the restored thread.
 
 ```sh
 bb thread-list complete <thread-id> [--json]
@@ -147,16 +157,18 @@ The command palette exposes the same operations. API clients can use
 `threads.update({threadId, sectionId})`, `threadSections`, and the thread-list
 `setPreference` RPC for the same section and manual-order state.
 
-Set `autoActiveSectionId` to the Active section id to move a queued root thread
+Set `autoActiveSectionId` to the Active section id to move a queued or completed root thread
 to that section when it starts running:
 `bb thread-list prefs set autoActiveSectionId <active-section-id>`.
 The default is `null` (disabled). The backend rechecks current placement and only
-promotes unsectioned, unpinned, unarchived root threads. It prepends the thread to
+promotes unsectioned root threads or roots in the configured Completed section,
+provided they are unpinned and unarchived. It prepends the thread to
 manual order, selects Manual sorting, and disables read-status grouping so the
 newly active thread appears at the top. When a thread in that Active section becomes
 idle, it returns to the top of the unsectioned queue, selecting Manual sorting
 and disabling read-status grouping so it stays first. Threads
-in Completed or another section stay there, including after another run. The
+restarted from Completed follow the same Active → Queued path. Threads in other
+custom sections stay there, including after another run. The
 backend rereads current status and placement before moving a thread, so stale
 finish events do not move a newly running thread or override a manual move.
 Deleted destinations are ignored. Reset the preference
@@ -164,12 +176,69 @@ to disable the rule. The `setPreference` RPC accepts the same key and value.
 
 Sidebar keyboard selection uses core `sidebar.focus` (Command+Left on macOS)
 and `chat.focus` (Command+Right). Arrow Up/Down selects a thread without opening
-it; Enter opens it, or starts inline rename when it is already open. The selector has an outline. `sidebar.archiveSelected`
+it; Enter opens it, or starts inline rename when it is already open. The selector has a persistent outline. Opening a thread from the sidebar keeps keyboard control with that selector, including after completion and archive. Click the message box or use `chat.focus` to edit; `sidebar.focus` returns to the remembered selector. `sidebar.archiveSelected`
 (Mod+Backspace) archives the selected row using the same core action as its
 menu and preserves a neighboring selector. Pipeline movement commands target
 the focused row, so Option+Up/Down reorders the selector's thread. Returning
 from chat restores the last sidebar selection. Focus shortcuts and archive
-are rebindable through core Keyboard settings.
+are rebindable through core Keyboard settings. Press P while the sidebar selector is
+on a thread to pin it, or unpin it when already pinned. This shortcut only acts
+on the focused sidebar row and leaves typing in editors unchanged. To add a
+modifier shortcut, bind `plugin:thread-list/pin` in Settings → Keyboard. SDK and CLI clients use the
+existing `threads.pin` / `threads.unpin` and `bb thread pin` / `bb thread unpin`
+operations.
+
+## Backlog follow-ups
+
+The section named Backlog is adopted automatically. `backlogSectionId` (default
+`null`) records its id; set it explicitly to use another section. A deleted
+configured section disables refresh until it is reconfigured. Entering Backlog
+starts an implicit seven-day countdown (`backlogRefreshDays`, default `7`, range
+1–3650). Existing Backlog roots start their first countdown when the policy first
+observes them. Children stay with their root. Pinned, archived, deleted, and
+manually moved threads are not pulled back by an old deadline.
+
+The sidebar shows a Backlog to triage banner below New thread and above the
+thread groups while Backlog roots need a follow-up date. Its count uses the same
+eligible threads as triage, updates as dates and placement change, and disappears
+when none remain. Click the banner to start triage.
+
+Command+E (Control+E elsewhere), command `plugin:thread-list/triage-backlog`, walks
+through Backlog roots that have no explicit follow-up date. It never includes
+Queued or Active threads, or threads already given a date. Type `7d`, `7 days`,
+`61 min`, `tomorrow at 3pm`, or `Sep 1`; the input previews the resolved local
+date. Enter saves and advances, Tab or Skip leaves the default countdown, and Escape
+closes. Date-only input uses 9am in the client's timezone; a date without a year
+uses its next occurrence. Invalid and past dates cannot be saved. Explicit dates
+replace the implicit deadline. A thread's Follow up… menu action can edit an
+existing date or schedule a Queued/Active thread, moving it to Backlog without
+stopping its run. Cmd+E still only triages unscheduled Backlog work.
+
+The server checks deadlines every minute and once at startup, so overdue work
+catches up after downtime. It waits for running threads to become idle. Due
+threads return to the bottom of the unsectioned Queued group, below the
+horizontal Refreshed divider. They remain there when opened; sending a message
+or starting a run makes them hot again. Refresh does not send a message or start
+an agent. Worktree grouping cannot merge hot and refreshed rows across the
+divider. Deadlines and refreshed markers are stored in the plugin's database.
+
+```sh
+bb thread-list backlog list --json
+bb thread-list backlog schedule <thread-id> '61 min' --timezone America/Los_Angeles
+bb thread-list backlog clear <thread-id>
+bb thread-list prefs set backlogRefreshDays 7
+bb thread-list prefs set backlogSectionId <section-id>
+```
+
+`backlog clear` removes an explicit date and restarts the default countdown.
+The `backlogState`, `scheduleFollowUp`, and `clearFollowUp` plugin RPCs expose the
+same operations through `bb.sdk.plugins.callRpc`. `scheduleFollowUp` accepts
+`{threadId, input, timeZone, onlyBacklog?}`; `onlyBacklog: true` rejects threads
+moved out of Backlog while triage was open. The other inputs are `null` and
+`{threadId}`, respectively. Every result is `{sectionId, items}`. Each item has
+`threadId`, `sectionId`, `enteredAt`, `followUpAt` (null for the implicit policy),
+`refreshAt`, `refreshedAt`, and `stage` (`backlog`, `refreshing`, or `refreshed`).
+CLI defaults to the server's timezone; pass `--timezone` for the client's zone.
 
 ## Visible threads
 
@@ -192,3 +261,37 @@ and archive; Command/Control+Enter confirms it and dismisses the toast.
 Completion Undo restores the previous section, parent, and pinned state.
 After typing, these shortcuts belong to the editor again; Undo and Confirm
 remain clickable in the toast. CLI and RPC completion remain immediate.
+
+During Backlog follow-up triage, Cmd+P peeks at the thread’s human input messages. Cmd+P or Escape returns to the same date draft. CLI: `bb thread log <id> --user-messages --all`. Plugins can use `navigate.toThread(id, { experimental_userMessagesOnly: true })`, and pass false to restore the timeline.
+
+## Quick-decision dots
+
+The existing unread/status dot becomes strong red for an almost immediate decision,
+or lighter red for a short read or brief reply. A tooltip explains the estimate.
+The ordinary unread dot remains blue; failures keep the existing error icon.
+Quick decisions sort first in the unsectioned queue (instant, then quick), retaining
+saved order within each tier. Pinned and custom-section order are preserved. A
+blocked child can bring its queued parent forward without detaching the child.
+Reading a thread leaves its decision outstanding; replying, resuming, resolving the
+question, completing, archiving, or deleting clears it.
+
+New idle replies and pending questions are classified once, in the background,
+through the Codex provider's existing AI completion service and primary-machine
+sign-in. These requests use that account's allowance. There is no history backfill
+or inference on sidebar render. Uncertain, malformed, unavailable, consequential,
+or context-heavy decisions retain normal appearance and order. Estimates concern
+human attention, not task duration or urgency.
+
+```sh
+bb thread-list decisions list --json
+bb thread-list decisions refresh <thread-id> --json
+bb thread-list prefs set quickDecisions false
+```
+
+`quickDecisions` defaults to true. Turning it off hides decision dots and ordering
+and stops new classification requests. An explicit refresh retries a request after
+an unavailable service or classifies an existing thread. SDK clients use
+`plugins.callRpc` with plugin id `thread-list`, method `decisionsState`, input
+`null`, or method `refreshDecision`, input `{ threadId }`. Both return
+`{ items: [{ threadId, requestKey, interactionId, level, reason, classifiedAt }] }`.
+Full conversation text and credentials are not stored in decision metadata.

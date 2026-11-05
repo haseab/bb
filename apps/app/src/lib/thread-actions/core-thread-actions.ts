@@ -1,3 +1,5 @@
+import { useProjectEditor } from "@/lib/project-editor";
+import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
@@ -250,6 +252,22 @@ export const CORE_THREAD_ACTIONS: readonly PluginThreadActionRegistration<unknow
         icon: "Edit",
         run: ({ requestRename }) => requestRename(thread.id),
       }),
+    }),
+    coreThreadAction({
+      id: "editProject",
+      group: GROUPS.organize,
+      order: 60,
+      title: "Edit project…",
+      icon: "Folder",
+      useData: useProjectEditor,
+      item: ({ thread, data: editProject }) =>
+        thread.projectId === PERSONAL_PROJECT_ID
+          ? null
+          : {
+              label: "Edit project…",
+              icon: "Folder",
+              run: () => afterMenuCloses(() => editProject(thread.projectId)),
+            },
     }),
     coreThreadAction({
       id: "archive",

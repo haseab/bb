@@ -240,7 +240,7 @@ On macOS, `sidebar.focus` (`Mod+ArrowLeft`) focuses the last selected sidebar
 thread and opens the sidebar if needed; `chat.focus` (`Mod+ArrowRight`) restores
 chat focus or focuses the composer. These focus commands start unassigned on
 Windows/Linux. While a sidebar thread is focused, Up/Down moves its outlined
-selector without opening threads, and Enter opens it. Enter on the already open thread starts inline rename. `sidebar.archiveSelected`
+selector without opening threads, and Enter opens it. The selector remains visible when chat has focus. Opening a thread from the sidebar keeps keyboard control on its selector, including after completion or archive; click the composer or use `chat.focus` to start editing. Enter on the already open thread starts inline rename. `sidebar.archiveSelected`
 (`Mod+Backspace`) archives that selected thread through the normal archive flow
 and retains a neighboring selector. It does not run in text editors or chat.
 These commands are available in the palette, Settings → Keyboard, CLI keyboard
@@ -439,3 +439,30 @@ may drop it on save; older strict readers can reject the whole file, so keep a
 backup before rolling back to a build predating the tolerant-reader fix #5286.
 
 The small sidebar version shows `v0.47` above a rebuild count such as `#12`. Only explicit rebuilds increment the count; dev edits, hot reloads, and launches do not. `pnpm desktop:package` counts once across its nested compilations. `bb settings version --json` and `sdk.system.version()` report the served frontend as `localBuildVersion` when its build metadata is available.
+
+
+Local source restart (macOS)
+
+`bb restart start --checkout <normal-bb-checkout>` starts a detached build using
+`pnpm desktop:package`, leaving the installed app and running threads alone.
+After bundle verification, it holds new sends in the queue, waits for running
+threads and in-flight dispatches to finish, then installs and verifies
+`/Applications/bb.app`. Queued sends resume after verification. Build or
+verification failures preserve or restore the previous installation.
+
+- `bb restart status [--json]` reports the runtime admission hold and build job.
+- `bb restart cancel` cancels a pending build/wait and releases the hold.
+- `bb restart now` explicitly permits interrupting running threads after the
+  build is verified. `bb restart start --now` requests this from the start.
+
+Cancel and Restart now controls also appear in the app while a restart is
+pending. Restart now is disabled during the build. A runtime without restart
+admission support blocks automatic installation; it never silently forces a
+restart. The source coordinator's `status`, `cancel`, and `now` commands remain
+available for this first-upgrade case.
+
+SDK: `system.localRestart()` reads status; `system.controlLocalRestart()` accepts
+`cancel` or `now` with the current job `id`. The coordinator uses `acquire`,
+`renew`, `commit`, and `release` with a UUID lease token. Commit checks for idle
+atomically; leases expire after two minutes without renewal so a crashed worker
+cannot pause dispatch permanently.

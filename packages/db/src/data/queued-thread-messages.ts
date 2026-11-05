@@ -447,6 +447,7 @@ const ORDINARY_TURN_END_WAIT_KINDS = ["thread-busy", "turn-starting"] as const;
 const IDLE_DRAINABLE_WAIT_KINDS = [
   ...ORDINARY_TURN_END_WAIT_KINDS,
   "stopping",
+  "restart",
 ] as const;
 
 function hasOrdinaryTurnEndWait(row: QueuedThreadMessageRow): boolean {

@@ -1,3 +1,6 @@
+import { useAtomValue } from "jotai";
+import { threadUserMessagesOnlyAtom } from "./user-message-peek";
+import { userMessageRows } from "@bb/thread-view";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ActiveThinking, ThreadRuntimeDisplayStatus } from "@bb/domain";
 import type { TimelineRow } from "@bb/server-contract";
@@ -175,7 +178,41 @@ export function ThreadTimelineSurface({
   unreadDividerPlacement,
   workspaceRootPath,
 }: ThreadTimelineSurfaceProps) {
+  const userOnly = useAtomValue(threadUserMessagesOnlyAtom(threadId));
+  const visibleRows = useMemo(
+    () => (userOnly ? userMessageRows(timelineRows) : timelineRows),
+    [userOnly, timelineRows],
+  );
+  const [peekLoadFailed, setPeekLoadFailed] = useState(false);
+  useEffect(() => {
+    setPeekLoadFailed(false);
+  }, [userOnly, threadId]);
+  useEffect(() => {
+    if (
+      !userOnly ||
+      !hasOlderTimelineRows ||
+      isLoadingOlderTimelineRows ||
+      isThreadTimelinePending ||
+      timelineError ||
+      peekLoadFailed ||
+      !onLoadOlderRows
+    )
+      return;
+    void Promise.resolve()
+      .then(onLoadOlderRows)
+      .catch(() => setPeekLoadFailed(true));
+  }, [
+    userOnly,
+    hasOlderTimelineRows,
+    isLoadingOlderTimelineRows,
+    isThreadTimelinePending,
+    timelineError,
+    peekLoadFailed,
+    onLoadOlderRows,
+    timelineRows,
+  ]);
   const showCatchUpIndicator =
+    !userOnly &&
     isCatchingUpTimeline &&
     !isThreadTimelinePending &&
     !timelineError &&
@@ -192,8 +229,8 @@ export function ThreadTimelineSurface({
       ? activeThinking.id
       : (ongoingIndicatorLabel ?? "working");
   const timelineRowsWithPendingStop = useTimelineRowsWithPendingStop({
-    rows: timelineRows,
-    isStopping,
+    rows: visibleRows,
+    isStopping: isStopping && !userOnly,
     stoppingAnchorAt,
     threadId,
   });
@@ -202,6 +239,7 @@ export function ThreadTimelineSurface({
     SHORT_LIVED_STATUS_DELAY_MS,
   );
   const isOngoingIndicatorVisible =
+    !userOnly &&
     showOngoingIndicator &&
     (timelineRowsWithPendingStop.length > 0 || isOngoingIndicatorSustained);
   const showLoadOlderRows =
@@ -212,8 +250,26 @@ export function ThreadTimelineSurface({
 
   return (
     <TimelineReasoningExpansionProvider key={threadId}>
-      <ConversationTimeline className="flex-1">
+      <ConversationTimeline
+        className={
+          userOnly
+            ? "flex-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+            : "flex-1"
+        }
+      >
         {leadingContent}
+        {userOnly &&
+        !isThreadTimelinePending &&
+        !timelineError &&
+        visibleRows.length === 0 ? (
+          <TimelineStatusIndicator
+            label={
+              hasOlderTimelineRows
+                ? "Loading your messages…"
+                : "No input messages in this thread."
+            }
+          />
+        ) : null}
         {showLoadOlderRows ? (
           <LoadOlderMessages
             key={`context-boundary:${contextBoundarySeq}`}

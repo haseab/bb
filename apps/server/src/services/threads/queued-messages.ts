@@ -1,3 +1,4 @@
+import { restartAdmissionGate } from "../system/local-restart.js";
 import {
   getLatestThreadSequence,
   claimNextQueuedThreadMessageGroup,
@@ -146,6 +147,8 @@ export function createAutomaticQueuedMessageGroupEligibility(
         return false;
       const waitingOn = parseStoredQueuedThreadMessageWaitingOn(member);
       switch (waitingOn?.kind) {
+        case "restart":
+          return !restartAdmissionGate(deps.db).status().paused;
         case undefined:
         case "plugin":
           return true;
@@ -696,15 +699,23 @@ async function sendClaimedQueuedMessageForThread(
   deps: LoggedPendingInteractionWorkSessionDeps,
   args: SendClaimedQueuedMessageForThreadArgs,
 ): Promise<ThreadQueuedMessage> {
-  const notice = await sendClaimedSystemNotice(deps, args);
-  if (notice) {
-    return notice;
-  }
-  const sent = await withThreadSendGuard(args.thread.id, () =>
-    sendClaimedQueuedMessageForIdleProviderThread(deps, args),
+  return restartAdmissionGate(deps.db).run((allowed) =>
+    sendAdmittedClaimedQueuedMessageForThread(deps, args, allowed),
   );
-  if (sent) {
-    return sent;
+}
+
+async function sendAdmittedClaimedQueuedMessageForThread(
+  deps: LoggedPendingInteractionWorkSessionDeps,
+  args: SendClaimedQueuedMessageForThreadArgs,
+  allowed: boolean,
+): Promise<ThreadQueuedMessage> {
+  if (allowed) {
+    const notice = await sendClaimedSystemNotice(deps, args);
+    if (notice) return notice;
+    const sent = await withThreadSendGuard(args.thread.id, () =>
+      sendClaimedQueuedMessageForIdleProviderThread(deps, args),
+    );
+    if (sent) return sent;
   }
 
   const queuedMessages = args.queuedMessages.map(toThreadQueuedMessage);
@@ -772,6 +783,8 @@ async function sendClaimedQueuedMessageForThread(
 /** The user-facing half of a core wait, for a refused "Send now". */
 function describeCoreWait(waitingOn: QueuedMessageWaitingOn | null): string {
   switch (waitingOn?.kind) {
+    case "restart":
+      return "BB is preparing to restart";
     case "provisioning":
       return "the thread's workspace is still being prepared";
     case "host-offline":

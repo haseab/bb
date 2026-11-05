@@ -85,3 +85,5 @@ export {
   type ExternalUserBoundaryMessage,
   type ExternalUserBoundaryTurnSpan,
 } from "./external-user-boundaries.js";
+
+export { userMessageRows } from "./user-message-rows.js";

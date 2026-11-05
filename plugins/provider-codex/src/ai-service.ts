@@ -1,5 +1,10 @@
+import { codexAiRpcContract } from "./ai/rpc-contract.js";
 import { Buffer } from "node:buffer";
-import type { BbPluginApi, PluginAiServiceStatus } from "@get-bb/plugin-sdk";
+import type {
+  BbPluginApi,
+  PluginAiServiceStatus,
+  PluginAiCompleteOptions,
+} from "@get-bb/plugin-sdk";
 import {
   codexAiHostContract,
   type CodexAiFailureCode,
@@ -38,28 +43,38 @@ export function registerCodexAiService(bb: BbPluginApi): void {
     throw new Error(result.message);
   }
 
+  async function complete(prompt: string, { signal }: PluginAiCompleteOptions) {
+    const hostId = await requirePrimaryHostId();
+    let last: CodexAiTextResult | null = null;
+    for (const model of CODEX_TEXT_MODELS) {
+      last = await host.call(
+        "codex.ai.complete",
+        { model, prompt, timeoutMs: COMPLETE_TIMEOUT_MS },
+        {
+          hostId,
+          signal,
+          timeoutMs: COMPLETE_TIMEOUT_MS + HOST_CALL_GRACE_MS,
+        },
+      );
+      if (last.ok || !RETRY_WITH_NEXT_MODEL.has(last.code)) break;
+      if (signal.aborted) break;
+    }
+    if (last === null) throw new Error("Codex did not answer");
+    return textOrThrow(last);
+  }
+
+  bb.rpc.register(codexAiRpcContract, {
+    async "ai.complete"({ prompt }) {
+      return {
+        text: await complete(prompt, { signal: AbortSignal.timeout(12_000) }),
+      };
+    },
+  });
+
   bb.experimental_aiServices.register({
     id: "codex",
     displayName: "Codex",
-    async complete(prompt, { signal }) {
-      const hostId = await requirePrimaryHostId();
-      let last: CodexAiTextResult | null = null;
-      for (const model of CODEX_TEXT_MODELS) {
-        last = await host.call(
-          "codex.ai.complete",
-          { model, prompt, timeoutMs: COMPLETE_TIMEOUT_MS },
-          {
-            hostId,
-            signal,
-            timeoutMs: COMPLETE_TIMEOUT_MS + HOST_CALL_GRACE_MS,
-          },
-        );
-        if (last.ok || !RETRY_WITH_NEXT_MODEL.has(last.code)) break;
-        if (signal.aborted) break;
-      }
-      if (last === null) throw new Error("Codex did not answer");
-      return textOrThrow(last);
-    },
+    complete,
     async transcribe(audio, { signal, hint }) {
       if (audio.size > TRANSCRIBE_MAX_BYTES) {
         throw new Error(

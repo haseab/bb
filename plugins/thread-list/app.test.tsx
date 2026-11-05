@@ -8,6 +8,9 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { getDefaultStore } from "jotai";
+import { quickDecisionsStateAtom } from "./app/decisions/state.js";
+import type { QuickDecision } from "./shared/decisions.js";
 import { makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PluginThreadListProps } from "@get-bb/plugin-sdk/app";
@@ -30,6 +33,7 @@ import {
   type PreferenceValues,
 } from "./shared/preferences.js";
 
+import { threadPinCommand } from "./app/pipeline/threadPinCommand.js";
 import { threadCompletionCommand } from "./app/pipeline/threadCompletionCommand.js";
 import { threadPipelineCommands } from "./app/pipeline/threadPipelineCommands.js";
 
@@ -158,6 +162,7 @@ function threadIds(): string[] {
 
 afterEach(() => {
   cleanup();
+  getDefaultStore().set(quickDecisionsStateAtom, { items: [] });
   resetPreferencesSyncForTest();
   setPreferencesMirrorStorageForTest(undefined);
 });
@@ -210,6 +215,126 @@ describe("thread-list plugin", () => {
       mod: true,
     });
   });
+
+  it.each(["configured", "named"] as const)(
+    "Cmd+Enter returns a selected Completed thread to Queued (%s section)",
+    async (mode) => {
+      setPreferencesMirrorStorageForTest(null);
+      const setCompleted = vi.fn((_input: unknown) => ({
+        threadId: "thr_later",
+        sectionId: null,
+      }));
+      const prefs = {
+        ...defaultPreferences(),
+        completedSectionId: mode === "configured" ? "sec_later" : null,
+      };
+      const view = renderList(prefs, {
+        sidebarThreads: {
+          projects: PROJECTS,
+          threads: THREADS,
+          sections: SECTIONS.map((section) =>
+            section.id === "sec_later"
+              ? { ...section, name: "Completed" }
+              : section,
+          ),
+        },
+        sdk: {
+          threads: {
+            get: vi.fn(
+              sdkResult(
+                makeThreadResponse({ id: "thr_later", sectionId: "sec_later" }),
+              ),
+            ),
+          },
+        },
+        rpc: { listPreferences: () => ({ preferences: prefs }), setCompleted },
+      });
+      const selected = await screen.findByRole("link", {
+        name: "Open Later thread",
+      });
+      selected.focus();
+      const context = {
+        threadId: "thr_later",
+        projectId: "proj_app",
+        openPanel: () => false,
+      };
+      await waitFor(() =>
+        expect(threadCompletionCommand.isAvailable?.(context)).toBe(true),
+      );
+      await act(async () => threadCompletionCommand.run(context));
+      expect(setCompleted).toHaveBeenCalledExactlyOnceWith({
+        threadId: "thr_later",
+        completed: false,
+      });
+      expect(view.inspection.navigateCalls).toContainEqual({
+        method: "toThread",
+        threadId: "thr_later",
+        options: { experimental_focusSidebar: true },
+      });
+    },
+  );
+
+  it.each([null, 1])(
+    "toggles the selected thread pin with P (pinnedAt: %s) and ignores editors",
+    async (pinnedAt) => {
+      setPreferencesMirrorStorageForTest(null);
+      const pin = vi.fn(sdkResult({ ok: true }));
+      const unpin = vi.fn(sdkResult({ ok: true }));
+      renderList(
+        {},
+        {
+          sdk: {
+            threads: {
+              get: vi.fn(
+                sdkResult(makeThreadResponse({ id: "thr_later", pinnedAt })),
+              ),
+              pin,
+              unpin,
+            },
+          },
+        },
+      );
+      await screen.findByText("Parent thread");
+      const context = {
+        threadId: "thr_parent",
+        projectId: "proj_app",
+        openPanel: () => false,
+      };
+      const selected = document.querySelector<HTMLAnchorElement>(
+        'a[data-sidebar-thread-id="thr_later"]',
+      )!;
+      selected.focus();
+      await waitFor(() =>
+        expect(threadPinCommand.isAvailable?.(context)).toBe(true),
+      );
+      fireEvent.keyDown(selected, { key: "p" });
+      await waitFor(() =>
+        expect(pinnedAt === null ? pin : unpin).toHaveBeenCalledOnce(),
+      );
+      expect(pinnedAt === null ? pin : unpin).toHaveBeenCalledExactlyOnceWith({
+        threadId: "thr_later",
+      });
+      expect(pinnedAt === null ? unpin : pin).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(selected);
+      for (const editor of [
+        document.createElement("input"),
+        document.createElement("textarea"),
+        document.createElement("div"),
+      ]) {
+        if (editor.tagName === "DIV") {
+          editor.setAttribute("contenteditable", "true");
+          editor.tabIndex = 0;
+        }
+        document.body.append(editor);
+        editor.focus();
+        expect(threadPinCommand.isAvailable?.(context)).toBe(false);
+        fireEvent.keyDown(editor, { key: "p" });
+        await act(async () => threadPinCommand.run(context));
+        editor.remove();
+      }
+      expect(pin.mock.calls.length + unpin.mock.calls.length).toBe(1);
+    },
+  );
 
   it.each(["chronological", "project", "machine"] as const)(
     "keeps Completed threads in their own section in %s view",
@@ -362,7 +487,11 @@ describe("thread-list plugin", () => {
     const { rpcCalls } = renderList({ organizationMode: "chronological" });
 
     await screen.findByText("Pinned thread");
-    expect(rpcCalls.map((call) => call.method)).toEqual(["listPreferences"]);
+    expect(rpcCalls.map((call) => call.method)).toEqual([
+      "listPreferences",
+      "backlogState",
+      "decisionsState",
+    ]);
     expect(sectionHeaders()).toEqual(["Pinned", "Later", "Review", "Threads"]);
     expect(threadIds()).toEqual([
       "thr_pinned",
@@ -583,4 +712,107 @@ describe("thread-list plugin", () => {
     link.click();
     await waitFor(() => expect(listProps.onNavigate).toHaveBeenCalledOnce());
   });
+});
+
+it("promotes quick decisions inside Queued and restores manual order after answering", async () => {
+  const threads = ["ordinary", "quick", "instant"].map((id) =>
+    makeSidebarThread({
+      id,
+      title: id,
+      latestAttentionAt: 10,
+      projectId: PERSONAL_PROJECT_ID,
+    }),
+  );
+  const items: QuickDecision[] = [
+    {
+      threadId: "quick",
+      level: "quick",
+      reason: "Brief reply",
+      requestKey: "idle:10:quick",
+      interactionId: null,
+      classifiedAt: 1,
+    },
+    {
+      threadId: "instant",
+      level: "instant",
+      reason: "One choice",
+      requestKey: "idle:10:instant",
+      interactionId: null,
+      classifiedAt: 2,
+    },
+  ];
+  const preferences = {
+    ...defaultPreferences(),
+    chronologicalSort: "manual" as const,
+    manualThreadOrder: ["ordinary", "quick", "instant"],
+  };
+  const slot = renderList(
+    {},
+    {
+      sidebarThreads: { projects: PROJECTS, threads, sections: [] },
+      rpc: {
+        listPreferences: () => ({ preferences }),
+        decisionsState: () => ({ items }),
+      },
+    },
+  );
+  await waitFor(() =>
+    expect(threadIds()).toEqual(["instant", "quick", "ordinary"]),
+  );
+  await act(async () => {
+    await slot.behavior.emitRealtime("quick-decisions", { items: [] });
+  });
+  await waitFor(() =>
+    expect(threadIds()).toEqual(["ordinary", "quick", "instant"]),
+  );
+  expect(
+    slot.inspection.rpcCalls.filter((call) => call.method === "setPreference"),
+  ).toEqual([]);
+});
+
+it("does not overwrite a newer realtime decision with a late initial snapshot", async () => {
+  let finish!: (value: { items: QuickDecision[] }) => void;
+  const thread = makeSidebarThread({
+    id: "instant",
+    title: "Choose a format",
+    projectId: PERSONAL_PROJECT_ID,
+    latestAttentionAt: 10,
+  });
+  const slot = renderList(
+    {},
+    {
+      sidebarThreads: { projects: PROJECTS, threads: [thread], sections: [] },
+      rpc: {
+        listPreferences: () => ({ preferences: defaultPreferences() }),
+        decisionsState: () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      },
+    },
+  );
+  await waitFor(() =>
+    expect(
+      slot.inspection.rpcCalls.some((call) => call.method === "decisionsState"),
+    ).toBe(true),
+  );
+  await act(async () => {
+    await slot.behavior.emitRealtime("quick-decisions", {
+      items: [
+        {
+          threadId: thread.id,
+          level: "instant",
+          reason: "One choice",
+          requestKey: "idle:10:request",
+          interactionId: null,
+          classifiedAt: 1,
+        },
+      ],
+    });
+  });
+  expect(screen.getByLabelText("Instant decision: One choice")).toBeTruthy();
+  await act(async () => {
+    finish({ items: [] });
+  });
+  expect(screen.getByLabelText("Instant decision: One choice")).toBeTruthy();
 });

@@ -1,3 +1,4 @@
+import { useDecisionComparator } from "../decisions/state.js";
 import { VisibleSidebarThreadsProvider } from "./VisibleSidebarThreads.js";
 import {
   ThreadListVisibility,
@@ -1319,6 +1320,8 @@ function toThreadListStatus(
   return status === "error" ? "unavailable" : status;
 }
 
+import { useRefreshedQueueComparator } from "../backlog/state.js";
+
 function ProjectListComponent({
   activeThreadId,
   onProjectSelect,
@@ -1602,7 +1605,7 @@ function ProjectListComponent({
     ready: preferencesReady && status === "ready",
   });
   const {
-    comparator: sidebarThreadComparator,
+    comparator: readStatusComparator,
     collapsedThreadIds,
     toggleThreadCollapsed,
   } = useReadStatusGrouping({
@@ -1610,6 +1613,14 @@ function ProjectListComponent({
     selectedThreadId,
     comparator: baseThreadComparator,
   });
+  const refreshedThreadComparator = useRefreshedQueueComparator(
+    readStatusComparator,
+    threads,
+  );
+  const sidebarThreadComparator = useDecisionComparator(
+    refreshedThreadComparator,
+    threads,
+  );
   const collapsedEnvironmentIds = useMemo(
     () => new Set(collapsedEnvironmentIdList),
     [collapsedEnvironmentIdList],

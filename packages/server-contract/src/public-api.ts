@@ -1,4 +1,9 @@
 import {
+  localRestartCommandSchema,
+  type LocalRestartCommand,
+  type LocalRestartStatus,
+} from "./api/local-restart.js";
+import {
   nativeSessionSnapshotSchema,
   type NativeSessionSnapshot,
   type NativeSessionSyncResult,
@@ -2151,6 +2156,20 @@ export const publicApiRoutes = {
         systemVersionQuerySchema,
       ),
       response: jsonResponse<SystemVersionResponse>(),
+    }),
+    localRestart: defineRoute({
+      path: "/system/local-restart",
+      method: "get",
+      request: noRequest<EmptyInput>(),
+      response: jsonResponse<LocalRestartStatus>(),
+    }),
+    controlLocalRestart: defineRoute({
+      path: "/system/local-restart",
+      method: "post",
+      request: jsonRequest<EmptyInput, LocalRestartCommand>(
+        localRestartCommandSchema,
+      ),
+      response: jsonResponse<LocalRestartStatus>(),
     }),
     appUpdate: defineRoute({
       path: "/system/app-update",

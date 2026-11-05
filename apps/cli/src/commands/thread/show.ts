@@ -2,6 +2,7 @@ import { prependOlderTimelineRows } from "@bb/client-core";
 import { Command } from "commander";
 import {
   formatThreadTimelineText,
+  userMessageRows,
   type ThreadTimelineTextFormat,
 } from "@bb/thread-view";
 import {
@@ -54,6 +55,7 @@ interface ThreadShowCommandOptions {
 }
 
 interface ThreadLogCommandOptions {
+  userMessages?: boolean;
   self?: boolean;
   json?: boolean;
   format?: string;
@@ -417,6 +419,10 @@ export function registerShowCommand(
     .command("log [id]")
     .aliases(["messages", "timeline"])
     .description("Show thread event log")
+    .option(
+      "--user-messages",
+      "Show only your input messages, excluding assistant, agent and system messages",
+    )
     .option("--self", "Target the current thread (from BB_THREAD_ID)")
     .option(
       "--json",
@@ -453,6 +459,13 @@ export function registerShowCommand(
         const sdk = createCliBbSdk(getUrl());
         const format = resolveThreadTimelineTextFormat(opts);
 
+        if (
+          opts.userMessages &&
+          (opts.message !== undefined || opts.afterSeq !== undefined)
+        )
+          throw new Error(
+            "--user-messages cannot be combined with --message or --after-seq",
+          );
         if (opts.message !== undefined) {
           await printThreadLogMessage(sdk, { threadId, format, opts });
           return;
@@ -468,7 +481,7 @@ export function registerShowCommand(
           throw new Error("--after-seq is only supported with --format json");
         }
 
-        if (format === "json") {
+        if (format === "json" && !opts.userMessages) {
           const events = opts.all
             ? await listAllThreadLogEvents(sdk, threadId, opts.afterSeq)
             : await listThreadLogEventsPage(sdk, {
@@ -504,7 +517,7 @@ export function registerShowCommand(
         }
         const timelineQuery = {
           threadId,
-          ...(format === "verbose"
+          ...(format === "verbose" || opts.userMessages
             ? { includeNestedRows: "true" as const }
             : {}),
           ...(segmentLimit === null
@@ -526,6 +539,11 @@ export function registerShowCommand(
             loadedRows: rows,
           });
           page = older.timelinePage;
+        }
+        if (opts.userMessages) rows = userMessageRows(rows);
+        if (format === "json") {
+          console.log(JSON.stringify(rows, null, 2));
+          return;
         }
         const color = process.stdout.isTTY === true && !process.env.NO_COLOR;
         const text = formatThreadTimelineText(rows, {

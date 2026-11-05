@@ -1,3 +1,4 @@
+import { RefreshedQueueDivider } from "../backlog/state.js";
 import {
   VisibleSidebarThreads,
   useVisibleSidebarThreads,
@@ -1809,6 +1810,7 @@ function SectionThreadTreeItems({
         const itemKey = getSidebarItemKey(item);
         return (
           <Fragment key={itemKey}>
+            <RefreshedQueueDivider items={items} index={index} />
             <SectionDndItemRow
               projectId={projectId ?? getItemProjectId(item)}
               item={item}

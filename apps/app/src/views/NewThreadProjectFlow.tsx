@@ -2,8 +2,13 @@ import {
   projectBadgeLabel,
   projectBadgeStyle,
 } from "@bb/shared-ui/project-identity";
-import { ProjectPickerDisclosure } from "./ProjectPickerDisclosure";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import { Button } from "@bb/shared-ui/button";
 import {
@@ -47,6 +52,7 @@ export function NewThreadProjectFlow({
   children,
 }: NewThreadProjectFlowProps) {
   const [query, setQuery] = useState("");
+  const [projectListOpen, setProjectListOpen] = useState(false);
   const [lastResetRequest, setLastResetRequest] = useState(resetRequest);
   const [error, setError] = useState<string | null>(null);
   const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
@@ -63,6 +69,7 @@ export function NewThreadProjectFlow({
 
   if (resetRequest !== null && resetRequest !== lastResetRequest) {
     setLastResetRequest(resetRequest);
+    setProjectListOpen(false);
     setQuery("");
     setError(null);
   }
@@ -79,8 +86,25 @@ export function NewThreadProjectFlow({
     return () => window.cancelAnimationFrame(frame);
   }, [choosing, onCompose]);
 
+  useEffect(() => {
+    if (!choosing) {
+      setProjectListOpen(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setProjectListOpen(true), 200);
+    return () => window.clearTimeout(timer);
+  }, [choosing, resetRequest]);
+
+  useLayoutEffect(() => {
+    if (choosing && autoFocus) inputRef.current?.focus({ preventScroll: true });
+  }, [choosing, autoFocus, loading, resetRequest]);
+
   const selectProject = async (nextProjectId: string) => {
-    if (pendingRef.current || loading) return;
+    if (
+      pendingRef.current ||
+      (loading && nextProjectId !== PERSONAL_PROJECT_ID)
+    )
+      return;
     pendingRef.current = true;
     const generation = generationRef.current;
     setPendingProjectId(nextProjectId);
@@ -103,74 +127,13 @@ export function NewThreadProjectFlow({
 
   return (
     <section aria-label="New thread" className="w-full space-y-5 py-4 md:py-8">
-      <ol
-        aria-label="New thread steps"
-        className="flex items-center gap-3 text-xs"
-      >
-        <li aria-current={choosing ? "step" : undefined}>
-          <button
-            type="button"
-            disabled={choosing || pendingProjectId !== null}
-            onClick={() => {
-              setQuery("");
-              setError(null);
-              setChoosing(true);
-            }}
-            className="flex items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span className="flex size-5 items-center justify-center rounded-full bg-foreground text-background">
-              {choosing ? (
-                "1"
-              ) : (
-                <Icon name="Check" className="size-3" aria-hidden />
-              )}
-            </span>
-            <span className="font-medium text-foreground">Project</span>
-            {!choosing ? <span className="sr-only">Change project</span> : null}
-          </button>
-        </li>
-        <li aria-hidden className="h-px w-8 bg-border" />
-        <li
-          aria-current={choosing ? undefined : "step"}
-          className={cn(
-            "flex items-center gap-2",
-            choosing && "text-muted-foreground",
-          )}
-        >
-          <span
-            className={cn(
-              "flex size-5 items-center justify-center rounded-full",
-              choosing ? "bg-muted" : "bg-foreground text-background",
-            )}
-          >
-            2
-          </span>
-          <span>Message</span>
-        </li>
-      </ol>
       {choosing ? (
         <>
-          <div className="space-y-1.5">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">
-              Where would you like to work?
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Choose a project, then start your thread.
-            </p>
-          </div>
-          <ProjectPickerDisclosure
-            key={lastResetRequest ?? "initial"}
-            label={selectedProject?.name ?? "Choose a project"}
-            autoFocus={autoFocus}
-            loading={loading}
-            inputRef={inputRef}
-            query={query}
-            onQueryChange={setQuery}
-          >
+          <div className="overflow-hidden rounded-xl border border-border bg-popover">
             <Command
               key={`${resetRequest ?? "project-picker"}-${loading ? "loading" : "ready"}`}
               label="Search projects"
-              defaultValue={projectId}
+              defaultValue={PERSONAL_PROJECT_ID}
               loop
               onKeyDownCapture={(event) => {
                 if (event.key !== "Escape" || query.length === 0) return;
@@ -180,122 +143,128 @@ export function NewThreadProjectFlow({
               }}
             >
               <CommandInput
+                asChild
                 ref={inputRef}
                 aria-label="Search projects"
                 placeholder="Search projects…"
                 value={query}
                 onValueChange={setQuery}
                 className="h-12 text-sm"
-              />
-              <CommandList
-                aria-busy={loading || pendingProjectId !== null}
-                className="max-h-[min(24rem,max(10rem,calc(100dvh_-_22rem)))] scroll-py-2 p-2"
               >
-                <CommandEmpty>
-                  No projects found. Try another name.
-                </CommandEmpty>
-                {loading ? (
-                  <p
-                    role="status"
-                    className="px-3 py-4 text-sm text-muted-foreground"
+                <input aria-expanded={projectListOpen} />
+              </CommandInput>
+              <div
+                data-project-options-state={projectListOpen ? "open" : "closed"}
+                aria-hidden={!projectListOpen}
+                inert={!projectListOpen}
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none",
+                  projectListOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0",
+                )}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <CommandList
+                    aria-busy={loading || pendingProjectId !== null}
+                    className="max-h-[min(32rem,max(10rem,calc(100dvh_-_14rem)))] scroll-py-2 p-2"
                   >
-                    Loading projects…
-                  </p>
-                ) : null}
-                {choices.length > 0 ? (
-                  <CommandGroup heading="Your projects">
-                    {choices.map((project) => (
+                    <CommandEmpty>
+                      No projects found. Try another name.
+                    </CommandEmpty>
+                    <CommandGroup>
                       <CommandItem
-                        key={project.id}
-                        value={project.id}
-                        keywords={[project.name]}
+                        value={PERSONAL_PROJECT_ID}
+                        keywords={["No project", "Personal", "Ask anything"]}
                         disabled={pendingProjectId !== null}
-                        onSelect={() => void selectProject(project.id)}
-                        className="group cursor-pointer gap-3 rounded-lg px-3 py-3"
+                        onSelect={() => void selectProject(PERSONAL_PROJECT_ID)}
+                        className="cursor-pointer gap-3 rounded-lg px-3 py-3"
                       >
-                        <span
-                          className="flex size-9 shrink-0 items-center justify-center rounded-lg"
-                          style={projectBadgeStyle(
-                            projectBadgeLabel(project.name),
-                          )}
-                        >
-                          <Icon name="Folder" aria-hidden />
-                        </span>
-                        <span className="min-w-0 flex-1 truncate font-medium">
-                          {project.name}
-                        </span>
-                        {project.id === projectId ? (
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            Last used
-                          </span>
-                        ) : null}
                         <Icon
-                          name={
-                            pendingProjectId === project.id
-                              ? "Loader2"
-                              : "ArrowRight"
-                          }
-                          className={cn(
-                            "text-muted-foreground opacity-0 group-data-[selected=true]:opacity-100",
-                            pendingProjectId === project.id &&
-                              "animate-spin opacity-100",
-                          )}
+                          name="FolderMinus"
+                          className="text-muted-foreground"
                           aria-hidden
                         />
+                        <span>No project</span>
                       </CommandItem>
-                    ))}
-                  </CommandGroup>
-                ) : null}
-                <CommandSeparator className="my-2" />
-                <CommandGroup heading="Other options">
-                  <CommandItem
-                    value={PERSONAL_PROJECT_ID}
-                    keywords={["No project", "Personal", "Ask anything"]}
-                    disabled={loading || pendingProjectId !== null}
-                    onSelect={() => void selectProject(PERSONAL_PROJECT_ID)}
-                    className="cursor-pointer gap-3 rounded-lg px-3 py-3"
-                  >
-                    <Icon
-                      name="FolderMinus"
-                      className="text-muted-foreground"
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div>No project</div>
-                      <div className="text-xs text-muted-foreground">
-                        Start with a personal workspace
-                      </div>
-                    </div>
-                  </CommandItem>
-                  <CommandItem
-                    value="create-project"
-                    keywords={["New project", "Add project"]}
-                    disabled={!canCreateProject || pendingProjectId !== null}
-                    onSelect={onCreateProject}
-                    className="cursor-pointer gap-3 rounded-lg px-3 py-3"
-                  >
-                    <Icon
-                      name="FolderPlus"
-                      className="text-muted-foreground"
-                      aria-hidden
-                    />
-                    New project
-                  </CommandItem>
-                </CommandGroup>
-              </CommandList>
+                    </CommandGroup>
+                    <CommandSeparator className="my-2" />
+                    {loading ? (
+                      <p
+                        role="status"
+                        className="px-3 py-4 text-sm text-muted-foreground"
+                      >
+                        Loading projects…
+                      </p>
+                    ) : null}
+                    {choices.length > 0 ? (
+                      <CommandGroup heading="Your projects">
+                        {choices.map((project) => (
+                          <CommandItem
+                            key={project.id}
+                            value={project.id}
+                            keywords={[project.name]}
+                            disabled={pendingProjectId !== null}
+                            onSelect={() => void selectProject(project.id)}
+                            className="group cursor-pointer gap-3 rounded-lg px-3 py-3"
+                          >
+                            <span
+                              className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                              style={projectBadgeStyle(
+                                projectBadgeLabel(project.name),
+                              )}
+                            >
+                              <Icon name="Folder" aria-hidden />
+                            </span>
+                            <span className="min-w-0 flex-1 truncate font-medium">
+                              {project.name}
+                            </span>
+                            {project.id === projectId ? (
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                Last used
+                              </span>
+                            ) : null}
+                            <Icon
+                              name={
+                                pendingProjectId === project.id
+                                  ? "Loader2"
+                                  : "ArrowRight"
+                              }
+                              className={cn(
+                                "text-muted-foreground opacity-0 group-data-[selected=true]:opacity-100",
+                                pendingProjectId === project.id &&
+                                  "animate-spin opacity-100",
+                              )}
+                              aria-hidden
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    ) : null}
+                    <CommandSeparator className="my-2" />
+                    <CommandGroup heading="Other options">
+                      <CommandItem
+                        value="create-project"
+                        keywords={["New project", "Add project"]}
+                        disabled={
+                          !canCreateProject || pendingProjectId !== null
+                        }
+                        onSelect={onCreateProject}
+                        className="cursor-pointer gap-3 rounded-lg px-3 py-3"
+                      >
+                        <Icon
+                          name="FolderPlus"
+                          className="text-muted-foreground"
+                          aria-hidden
+                        />
+                        New project
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </div>
+              </div>
             </Command>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border bg-surface-recessed px-4 py-3 text-xs text-muted-foreground">
-              <span>
-                <kbd className="font-mono">↑ ↓</kbd> to navigate
-              </span>
-              <span>
-                <kbd className="font-mono">Enter</kbd> to choose
-              </span>
-              <span>
-                <kbd className="font-mono">Esc</kbd> to clear search
-              </span>
-            </div>
-          </ProjectPickerDisclosure>
+          </div>
           {pendingProjectId !== null ? (
             <p role="status" className="text-sm text-muted-foreground">
               Preparing your workspace…

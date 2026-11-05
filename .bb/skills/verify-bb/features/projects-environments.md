@@ -59,3 +59,13 @@ recipe. External writes require a disposable test target and task authorization.
 - Reuse an environment with thread spawn --environment. environment update supports display name and merge-base override only. Test path switching with the supported thread environment-directory action separately. Source: `apps/cli/src/commands/environment.ts:579; apps/cli/src/commands/thread/spawn.ts`.
 - Commit all current workspace changes through UI/CLI, inspect git show and clean diff. This action stages git add -A; use a fixture containing only changes intended for this commit. Source: `packages/host-workspace/src/workspace.ts:985; apps/server/src/routes/environments.ts:575; apps/cli/src/commands/environment.ts:641`.
 - Create threads in two managed worktree environments; archive one with environment archive-threads. Local environments are rejected with HTTP409. Source: `apps/cli/src/commands/environment.ts:662; apps/server/src/routes/environments.ts`.
+
+### Edit project without leaving a conversation
+
+Open a project's context/overflow menu → Edit project… or a standard thread's
+context menu → Edit project…. Both open the same host dialog. Check the folder
+count, duplicate folder names with full paths and machine labels, Save name,
+Add folder after an existing attachment, and detach every folder. Folder edits
+save immediately and preserve files and threads. Personal threads omit this
+action. Verify compact drawer focus and that the app root stays accessible.
+The Plugin SDK exposes the same path with `experimental_useProjectEditor()`.
