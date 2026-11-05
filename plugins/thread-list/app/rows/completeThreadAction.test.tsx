@@ -259,7 +259,7 @@ describe("Complete thread menu action", () => {
   );
 
   it.each(["restored", "remounted", "failed"] as const)(
-    "returns the Command+Enter selector to the thread after Undo: %s",
+    "requests restoration of the original Command+Enter selector after Undo: %s",
     async (mode) => {
       setPreferencesMirrorStorageForTest(null);
       const current = makeSidebarThread({ id: "current" });
@@ -341,9 +341,8 @@ describe("Complete thread menu action", () => {
       fireEvent.click(screen.getByRole("button", { name: "Undo selector" }));
       await waitFor(() => expect(update).toHaveBeenCalledOnce());
       expect(document.activeElement).not.toBe(original);
-      let restored = original;
       if (mode === "remounted") {
-        restored = document.createElement("a");
+        const restored = document.createElement("a");
         restored.setAttribute("href", "#current");
         restored.dataset.sidebarThreadId = "current";
         restored.textContent = "Current";
@@ -360,12 +359,18 @@ describe("Complete thread menu action", () => {
           ),
         );
         expect(document.activeElement).not.toBe(original);
-      } else {
-        await waitFor(() => expect(document.activeElement).toBe(restored));
-        expect(threadCompletionCommand.isAvailable?.(context)).toBe(true);
       }
       expect(view.inspection.navigateCalls).toEqual([
         { method: "toThread", threadId: "next" },
+        ...(mode === "failed"
+          ? []
+          : [
+              {
+                method: "toThread",
+                threadId: "current",
+                options: { experimental_focusSidebar: true },
+              },
+            ]),
       ]);
     },
   );

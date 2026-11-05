@@ -36,35 +36,43 @@ function focusThreadRow(threadId: string, attempts = 12): void {
 export function useThreadCompletion() {
   usePreferencesSync();
   const ready = usePreferencesReady();
-  const sectionId = useAtomValue(sidebarCompletedSectionIdAtom);
+  const configuredSectionId = useAtomValue(sidebarCompletedSectionIdAtom);
   const rpc = useRpc<typeof threadListRpcContract>();
   const sdk = useSdk();
   const navigate = useBbNavigate();
-  const { projects } = useSidebarData();
+  const { projects, sections } = useSidebarData();
+  const sectionId =
+    configuredSectionId ??
+    sections.find((section) => section.name.toLowerCase() === "completed")
+      ?.id ??
+    null;
   const setCompleted = useCallback(
     async (threadId: string, completed: boolean) => {
-      const source = completed
-        ? [
-            ...document.querySelectorAll<HTMLAnchorElement>(
-              "a[data-sidebar-thread-id]",
-            ),
-          ].find((link) => link.dataset.sidebarThreadId === threadId)
-        : undefined;
+      const source = [
+        ...document.querySelectorAll<HTMLAnchorElement>(
+          "a[data-sidebar-thread-id]",
+        ),
+      ].find((link) => link.dataset.sidebarThreadId === threadId);
       const restoreSelector =
-        source !== undefined && document.activeElement === source;
-      const nextThreadId = source
-        ? completionNextThreadId(
-            threadId,
-            collectVisibleThreadIds(source),
-            projects.flatMap((project) => project.threads),
-            sectionId,
-          )
-        : undefined;
+        source !== undefined &&
+        (document.activeElement === source ||
+          source.dataset.sidebarThreadCursor === "true");
+      const nextThreadId =
+        completed && source
+          ? completionNextThreadId(
+              threadId,
+              collectVisibleThreadIds(source),
+              projects.flatMap((project) => project.threads),
+              sectionId,
+            )
+          : undefined;
       captureThreadPipelinePositions(!source);
       try {
         const previous = await sdk.threads.get({ threadId });
         await rpc.call("setCompleted", { threadId, completed });
-        if (nextThreadId !== undefined) {
+        if (!completed && restoreSelector)
+          navigate.toThread(threadId, { experimental_focusSidebar: true });
+        else if (nextThreadId !== undefined) {
           if (nextThreadId === null) navigate.toCompose();
           else {
             navigate.toThread(nextThreadId);
@@ -90,7 +98,9 @@ export function useThreadCompletion() {
                   if (previous.pinnedAt !== null)
                     await sdk.threads.pin({ threadId });
                   if (restoreSelector)
-                    requestAnimationFrame(() => focusThreadRow(threadId));
+                    navigate.toThread(threadId, {
+                      experimental_focusSidebar: true,
+                    });
                 } catch {
                   toast.error("Failed to undo thread change.");
                 }

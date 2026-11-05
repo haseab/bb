@@ -3688,3 +3688,7 @@ external user-message origins, host/project mapping and concurrent writers.
 ## BbNavigate.toThread experimental_userMessagesOnly
 
 Transient human-input-only timeline mode used by Thread List Backlog peek. False or ordinary navigation restores the full timeline. The shared ThreadTimelineSurface filters assistant, agent and system rows, preserving native user attachments, and loads older pages. Audit nested turn filtering, cancellation and keyboard focus before stabilization.
+
+## BbNavigate.toThread experimental_focusSidebar
+
+Requests persistent sidebar selection and keyboard focus for navigation, surviving delayed row restoration and remounts. Core archive Undo and Thread List completion Undo share sidebarThreadFocusRequestAtom and SidebarKeyboardControls. Subsequent user input or navigation releases the request. Audit virtualized rows, Undo failures and split-pane navigation before stabilization.

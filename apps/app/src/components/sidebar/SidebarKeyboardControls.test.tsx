@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+
+import { getDefaultStore } from "jotai";
+import { sidebarThreadFocusRequestAtom } from "@/lib/sidebar-thread-focus";
 import { useRef } from "react";
 import {
   act,
@@ -52,15 +55,23 @@ const scrolling = Object.getOwnPropertyDescriptor(
   "scrollIntoView",
 );
 
-function Harness({ ids = ["first", "second", "third"] }: { ids?: string[] }) {
+function Harness({
+  ids = ["first", "second", "third"],
+  activeThreadId = "first",
+  enabled = true,
+}: {
+  ids?: string[];
+  activeThreadId?: string | null;
+  enabled?: boolean;
+}) {
   const root = useRef<HTMLDivElement>(null);
   return (
     <>
       <div ref={root}>
         <SidebarKeyboardControls
           rootRef={root}
-          activeThreadId="first"
-          enabled
+          activeThreadId={activeThreadId}
+          enabled={enabled}
         />
         {ids.map((id) => (
           <div key={id} data-sidebar-rename-row="">
@@ -76,13 +87,17 @@ function Harness({ ids = ["first", "second", "third"] }: { ids?: string[] }) {
         <input aria-label="Rename" />
       </div>
       <div data-app-content-shell="">
-        <input aria-label="Composer" />
+        <div data-app-composer="">
+          <input aria-label="Composer" />
+        </div>
+        <input aria-label="New project search" />
       </div>
     </>
   );
 }
 
 beforeEach(() => {
+  getDefaultStore().set(sidebarThreadFocusRequestAtom, null);
   state.handlers.clear();
   vi.clearAllMocks();
   for (const id of ["first", "second", "third"])
@@ -102,6 +117,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  getDefaultStore().set(sidebarThreadFocusRequestAtom, null);
   vi.restoreAllMocks();
   state.entries.clear();
   if (visibility)
@@ -135,6 +151,19 @@ describe("sidebar keyboard focus", () => {
     const third = screen.getByRole("link", { name: "third" });
     fireEvent.keyDown(third, { key: "ArrowDown" });
     expect(document.activeElement).toBe(third);
+  });
+
+  it("restores a visible selector on the first focus command without waiting for animation frames", () => {
+    render(<Harness />);
+    act(() => screen.getByRole("textbox", { name: "Composer" }).focus());
+    vi.mocked(window.requestAnimationFrame).mockClear();
+    act(() => {
+      command("sidebar.focus");
+    });
+    expect(document.activeElement).toBe(
+      screen.getByRole("link", { name: "first" }),
+    );
+    expect(window.requestAnimationFrame).not.toHaveBeenCalled();
   });
 
   it("remembers the sidebar selector and restores focus to the chat field", () => {
@@ -175,6 +204,157 @@ describe("sidebar keyboard focus", () => {
     );
   });
 
+  it("keeps a clicked thread focused and ready for selector shortcuts", () => {
+    const view = render(<Harness />);
+    const second = screen.getByRole("link", { name: "second" });
+    fireEvent.click(second);
+    view.rerender(<Harness activeThreadId="second" />);
+    expect(second.getAttribute("data-sidebar-thread-cursor")).toBe("true");
+    expect(document.activeElement).toBe(second);
+    fireEvent.keyDown(second, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(
+      screen.getByRole("link", { name: "third" }),
+    );
+    act(() => {
+      command("sidebar.archiveSelected");
+    });
+    expect(state.archive).toHaveBeenCalledOnce();
+  });
+
+  it.each(["completion", "archive"])(
+    "moves the cursor to the conversation shown after %s without taking chat focus",
+    (action) => {
+      const view = render(<Harness activeThreadId="second" />);
+      const composer = screen.getByRole("textbox", { name: "Composer" });
+      act(() => composer.focus());
+      view.rerender(
+        <Harness
+          activeThreadId="third"
+          ids={
+            action === "archive"
+              ? ["first", "third"]
+              : ["second", "first", "third"]
+          }
+        />,
+      );
+      expect(
+        screen
+          .getByRole("link", { name: "third" })
+          .getAttribute("data-sidebar-thread-cursor"),
+      ).toBe("true");
+      expect(
+        screen
+          .getByRole("link", { name: "first" })
+          .hasAttribute("data-sidebar-thread-cursor"),
+      ).toBe(false);
+      expect(document.activeElement).toBe(composer);
+      act(() => {
+        command("sidebar.focus");
+      });
+      expect(document.activeElement).toBe(
+        screen.getByRole("link", { name: "third" }),
+      );
+    },
+  );
+
+  it("keeps keyboard focus with the cursor when the next conversation opens", () => {
+    const view = render(<Harness activeThreadId="second" />);
+    act(() => screen.getByRole("link", { name: "second" }).focus());
+    view.rerender(<Harness activeThreadId="third" />);
+    const third = screen.getByRole("link", { name: "third" });
+    expect(third.getAttribute("data-sidebar-thread-cursor")).toBe("true");
+    expect(document.activeElement).toBe(third);
+    fireEvent.keyDown(third, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(
+      screen.getByRole("link", { name: "second" }),
+    );
+  });
+
+  it("retains the next cursor when a row disappears while chat has focus", async () => {
+    const view = render(<Harness activeThreadId="second" />);
+    const composer = screen.getByRole("textbox", { name: "Composer" });
+    act(() => composer.focus());
+    view.rerender(<Harness activeThreadId="second" ids={["first", "third"]} />);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("link", { name: "third" })
+          .getAttribute("data-sidebar-thread-cursor"),
+      ).toBe("true"),
+    );
+    expect(document.activeElement).toBe(composer);
+  });
+
+  it("synchronizes the selector when the sidebar becomes available after navigation", () => {
+    const view = render(<Harness activeThreadId="first" enabled={false} />);
+    view.rerender(<Harness activeThreadId="third" enabled={false} />);
+    view.rerender(<Harness activeThreadId="third" />);
+    expect(
+      screen
+        .getByRole("link", { name: "third" })
+        .getAttribute("data-sidebar-thread-cursor"),
+    ).toBe("true");
+  });
+
+  it("restores Undo selection across delayed row removal and remount, then releases it for arrow navigation", async () => {
+    const view = render(<Harness activeThreadId="third" />);
+    act(() =>
+      getDefaultStore().set(sidebarThreadFocusRequestAtom, {
+        threadId: "second",
+      }),
+    );
+    const oldRow = screen.getByRole("link", { name: "second" });
+    expect(document.activeElement).toBe(oldRow);
+    view.rerender(<Harness activeThreadId="second" ids={["first", "third"]} />);
+    await act(async () => {});
+    expect(
+      document.querySelector("[data-sidebar-thread-cursor=true]"),
+    ).toBeNull();
+    view.rerender(<Harness activeThreadId="second" />);
+    const restored = screen.getByRole("link", { name: "second" });
+    expect(restored).not.toBe(oldRow);
+    await waitFor(() => expect(document.activeElement).toBe(restored));
+    expect(restored.getAttribute("data-sidebar-thread-cursor")).toBe("true");
+    fireEvent.keyDown(restored, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(
+      screen.getByRole("link", { name: "third" }),
+    );
+    expect(getDefaultStore().get(sidebarThreadFocusRequestAtom)).toBeNull();
+  });
+
+  it("allows a new conversation to focus its search and composer without restoring the old thread", () => {
+    const view = render(<Harness />);
+    const second = screen.getByRole("link", { name: "second" });
+    act(() => second.focus());
+    view.rerender(<Harness activeThreadId={null} />);
+    const search = screen.getByRole("textbox", { name: "New project search" });
+    act(() => search.focus());
+    expect(document.activeElement).toBe(search);
+    const composer = screen.getByRole("textbox", { name: "Composer" });
+    act(() => composer.focus());
+    expect(document.activeElement).toBe(composer);
+  });
+
+  it("lets an explicit click in the composer take keyboard ownership without losing the selector", () => {
+    render(<Harness />);
+    const second = screen.getByRole("link", { name: "second" });
+    act(() => second.focus());
+    const composer = screen.getByRole("textbox", { name: "Composer" });
+    fireEvent.pointerDown(composer);
+    act(() => composer.focus());
+    fireEvent.keyDown(composer, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(composer);
+    expect(second.getAttribute("data-sidebar-thread-cursor")).toBe("true");
+    act(() => {
+      command("sidebar.archiveSelected");
+    });
+    expect(state.archive).not.toHaveBeenCalled();
+    act(() => {
+      command("sidebar.focus");
+    });
+    expect(document.activeElement).toBe(second);
+  });
+
   it("leaves modifier arrows, renaming, and chat typing alone", () => {
     render(<Harness />);
     act(() => {
@@ -192,6 +372,7 @@ describe("sidebar keyboard focus", () => {
       command("sidebar.archiveSelected");
     });
     expect(state.archive).not.toHaveBeenCalled();
+    fireEvent.pointerDown(screen.getByRole("textbox", { name: "Composer" }));
     act(() => screen.getByRole("textbox", { name: "Composer" }).focus());
     fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
     expect(document.activeElement).toBe(

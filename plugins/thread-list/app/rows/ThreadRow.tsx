@@ -575,7 +575,7 @@ function ThreadRowComponent({
   const rowClassName = cn(
     SIDEBAR_HOVER_ACTIONS_ROW_CLASS,
     "group/thread-row cursor-pointer",
-    "has-[[data-sidebar-thread-id]:focus]:ring-1 has-[[data-sidebar-thread-id]:focus]:ring-inset has-[[data-sidebar-thread-id]:focus]:ring-sidebar-ring",
+    "has-[[data-sidebar-thread-cursor=true]]:ring-1 has-[[data-sidebar-thread-cursor=true]]:ring-inset has-[[data-sidebar-thread-cursor=true]]:ring-sidebar-ring",
     SIDEBAR_ROW_BASE_CLASS,
     LIST_HOVER_TRANSITION,
     parentOptions?.stickyLevel === undefined && "relative",

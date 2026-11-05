@@ -10,7 +10,7 @@ let available: ReadonlySet<string> = new Set();
 
 export const threadCompletionCommand: PluginCommandRegistration = {
   id: "complete",
-  title: "Complete selected thread",
+  title: "Complete or reopen selected thread",
   defaultShortcut: { key: "Enter", mod: true },
   isAvailable: () => {
     const threadId = focusedSidebarThreadId();
@@ -27,19 +27,20 @@ export function ThreadCompletionControls() {
   const { ready, sectionId, setCompleted } = useThreadCompletion();
   const { projects, status } = useSidebarData();
   useEffect(() => {
-    const run = (threadId: string) => setCompleted(threadId, true);
+    const threads = projects.flatMap((project) => project.threads);
+    const run = (threadId: string) =>
+      setCompleted(
+        threadId,
+        sectionId === null ||
+          threads.find((thread) => thread.id === threadId)?.sectionId !==
+            sectionId,
+      );
     complete = run;
     available = new Set(
       ready && status === "ready"
-        ? projects.flatMap((project) =>
-            project.threads
-              .filter(
-                (thread) =>
-                  thread.archivedAt === null &&
-                  (sectionId === null || thread.sectionId !== sectionId),
-              )
-              .map((thread) => thread.id),
-          )
+        ? threads
+            .filter((thread) => thread.archivedAt === null)
+            .map((thread) => thread.id)
         : [],
     );
     return () => {

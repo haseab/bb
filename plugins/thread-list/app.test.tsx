@@ -212,6 +212,64 @@ describe("thread-list plugin", () => {
     });
   });
 
+  it.each(["configured", "named"] as const)(
+    "Cmd+Enter returns a selected Completed thread to Queued (%s section)",
+    async (mode) => {
+      setPreferencesMirrorStorageForTest(null);
+      const setCompleted = vi.fn((_input: unknown) => ({
+        threadId: "thr_later",
+        sectionId: null,
+      }));
+      const prefs = {
+        ...defaultPreferences(),
+        completedSectionId: mode === "configured" ? "sec_later" : null,
+      };
+      const view = renderList(prefs, {
+        sidebarThreads: {
+          projects: PROJECTS,
+          threads: THREADS,
+          sections: SECTIONS.map((section) =>
+            section.id === "sec_later"
+              ? { ...section, name: "Completed" }
+              : section,
+          ),
+        },
+        sdk: {
+          threads: {
+            get: vi.fn(
+              sdkResult(
+                makeThreadResponse({ id: "thr_later", sectionId: "sec_later" }),
+              ),
+            ),
+          },
+        },
+        rpc: { listPreferences: () => ({ preferences: prefs }), setCompleted },
+      });
+      const selected = await screen.findByRole("link", {
+        name: "Open Later thread",
+      });
+      selected.focus();
+      const context = {
+        threadId: "thr_later",
+        projectId: "proj_app",
+        openPanel: () => false,
+      };
+      await waitFor(() =>
+        expect(threadCompletionCommand.isAvailable?.(context)).toBe(true),
+      );
+      await act(async () => threadCompletionCommand.run(context));
+      expect(setCompleted).toHaveBeenCalledExactlyOnceWith({
+        threadId: "thr_later",
+        completed: false,
+      });
+      expect(view.inspection.navigateCalls).toContainEqual({
+        method: "toThread",
+        threadId: "thr_later",
+        options: { experimental_focusSidebar: true },
+      });
+    },
+  );
+
   it.each([null, 1])(
     "toggles the selected thread pin with P (pinnedAt: %s) and ignores editors",
     async (pinnedAt) => {

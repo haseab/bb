@@ -138,6 +138,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "Use optimistic SDK writes and bb's actions to move, pin, rename, restore, archive, and split threads",
           "Open bb's project editor to inspect, attach, or detach source folders from a conversation",
           "Peek at human inputs with toThread(id, { experimental_userMessagesOnly: true }); pass false to restore the full conversation",
+          "Restore sidebar selection after Undo with toThread(id, { experimental_focusSidebar: true }), including delayed or remounted thread rows",
         ],
         apiSymbols: [
           "PluginThreadListRegistration",

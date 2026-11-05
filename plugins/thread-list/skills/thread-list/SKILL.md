@@ -7,8 +7,10 @@ description: "Inspect or change the sidebar thread list's layout preferences: or
 
 ## Complete and reopen threads
 
-Choose Complete from a thread's three-dot menu, or press Command+Enter
-(Control+Enter on other platforms) while the sidebar selector is on that thread.
+Press Command+Enter (Control+Enter on other platforms) on a selected thread to
+toggle completion. A thread in Completed returns to Queued and keeps the
+selector; other threads move into Completed. The three-dot menu also offers
+Complete or Reopen.
 The command is `plugin:thread-list/complete` and can be rebound in Settings →
 Keyboard. It only acts on the focused sidebar row, leaving composer submission
 unchanged. Completed rows offer Reopen to return to the unsectioned queue.
@@ -16,7 +18,8 @@ The default row quick action is Complete; Archive remains a separate menu action
 Completing a sidebar thread opens the next visible thread below it, skipping
 children that move with the completed parent and threads already in Completed.
 At the bottom it opens the previous remaining thread, or the new-thread screen
-when none remain. Reopen does not change the current chat. Navigation happens
+when none remain. Reopening with the selector keeps that thread open and
+focused in Queued. Navigation happens
 after completion succeeds; Undo restores placement without switching chats.
 When completion started from the focused sidebar selector (including
 Command/Control+Enter), Undo also returns that selector to the restored thread.
@@ -173,7 +176,7 @@ to disable the rule. The `setPreference` RPC accepts the same key and value.
 
 Sidebar keyboard selection uses core `sidebar.focus` (Command+Left on macOS)
 and `chat.focus` (Command+Right). Arrow Up/Down selects a thread without opening
-it; Enter opens it, or starts inline rename when it is already open. The selector has an outline. `sidebar.archiveSelected`
+it; Enter opens it, or starts inline rename when it is already open. The selector has a persistent outline. Opening a thread from the sidebar keeps keyboard control with that selector, including after completion and archive. Click the message box or use `chat.focus` to edit; `sidebar.focus` returns to the remembered selector. `sidebar.archiveSelected`
 (Mod+Backspace) archives the selected row using the same core action as its
 menu and preserves a neighboring selector. Pipeline movement commands target
 the focused row, so Option+Up/Down reorders the selector's thread. Returning

@@ -4858,6 +4858,8 @@ export interface BbNavigate {
       split?: boolean;
       /** Temporarily show only human input messages. Pass false to restore the full timeline. */
       experimental_userMessagesOnly?: boolean;
+      /** Restore sidebar selection and keyboard focus, including when the thread row remounts. */
+      experimental_focusSidebar?: boolean;
     },
   ): void;
   toProject(projectId: string): void;

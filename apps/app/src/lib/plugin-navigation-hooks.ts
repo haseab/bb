@@ -1,3 +1,4 @@
+import { sidebarThreadFocusRequestAtom } from "./sidebar-thread-focus";
 import { threadUserMessagesOnlyAtom } from "@/components/thread/timeline/user-message-peek";
 import { useCallback, useContext, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -55,6 +56,8 @@ export function useBbNavigate(): BbNavigate {
         threadUserMessagesOnlyAtom(threadId),
         options?.experimental_userMessagesOnly ?? false,
       );
+      if (options?.experimental_focusSidebar)
+        store.set(sidebarThreadFocusRequestAtom, { threadId });
       onNavigate?.();
       const open = (projectId: string) => {
         store.set(getThreadConversationCollapsedAtom(threadId), false);

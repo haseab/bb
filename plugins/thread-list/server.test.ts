@@ -377,6 +377,35 @@ it("validates lifecycle selection through CLI and RPC and broadcasts it", async 
   });
 });
 
+it("reopens a thread from the named Completed section before that section is configured", async () => {
+  const { bb, harness } = setup();
+  await plugin(bb);
+  const thread = makeThreadResponse({
+    id: "completed",
+    sectionId: "sec_completed",
+  });
+  harness.sdk.stub("threadSections.list", async () => [
+    { id: "sec_completed", name: "Completed", createdAt: 1, updatedAt: 1 },
+  ]);
+  harness.sdk.stub("threads.get", async () => thread);
+  harness.sdk.stub("threads.update", async () => ({
+    ...thread,
+    sectionId: null,
+  }));
+  await expect(
+    harness.behavior.callRpc("setCompleted", {
+      threadId: thread.id,
+      completed: false,
+    }),
+  ).resolves.toEqual({ threadId: thread.id, sectionId: null });
+  expect(harness.sdk.callsTo("threads.update")).toEqual([
+    [{ threadId: thread.id, sectionId: null }],
+  ]);
+  await expect(
+    bb.storage.kv.get("preference:completedSectionId"),
+  ).resolves.toBe("sec_completed");
+});
+
 describe("queued and completed thread promotion", () => {
   async function promotionHost() {
     const host = setup();

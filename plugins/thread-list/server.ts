@@ -230,16 +230,19 @@ export default async function threadListPlugin(bb: BbPluginApi) {
         throw new Error("Unarchive the thread before changing completion.");
       const sections = await bb.sdk.threadSections.list();
       const savedId = await store.read("completedSectionId");
-      let section = sections.find((candidate) => candidate.id === savedId);
+      let section =
+        sections.find((candidate) => candidate.id === savedId) ??
+        sections.find(
+          (candidate) => candidate.name.toLowerCase() === "completed",
+        );
       if (!completed) {
         if (!section || thread.sectionId !== section.id)
           return { threadId, sectionId: thread.sectionId };
+        if (savedId !== section.id)
+          await store.write("completedSectionId", section.id);
         await bb.sdk.threads.update({ threadId, sectionId: null });
         return { threadId, sectionId: null };
       }
-      section ??= sections.find(
-        (candidate) => candidate.name.toLowerCase() === "completed",
-      );
       section ??= await bb.sdk.threadSections.create({ name: "Completed" });
       if (savedId !== section.id)
         await store.write("completedSectionId", section.id);

@@ -240,7 +240,7 @@ On macOS, `sidebar.focus` (`Mod+ArrowLeft`) focuses the last selected sidebar
 thread and opens the sidebar if needed; `chat.focus` (`Mod+ArrowRight`) restores
 chat focus or focuses the composer. These focus commands start unassigned on
 Windows/Linux. While a sidebar thread is focused, Up/Down moves its outlined
-selector without opening threads, and Enter opens it. Enter on the already open thread starts inline rename. `sidebar.archiveSelected`
+selector without opening threads, and Enter opens it. The selector remains visible when chat has focus. Opening a thread from the sidebar keeps keyboard control on its selector, including after completion or archive; click the composer or use `chat.focus` to start editing. Enter on the already open thread starts inline rename. `sidebar.archiveSelected`
 (`Mod+Backspace`) archives that selected thread through the normal archive flow
 and retains a neighboring selector. It does not run in text editors or chat.
 These commands are available in the palette, Settings → Keyboard, CLI keyboard
