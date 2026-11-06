@@ -58,6 +58,7 @@ describe("thread-list preferences rpc", () => {
       harness.behavior.callRpc("setPreference", {
         key: "organizationMode",
         value: "machine",
+        origin: "window-a",
       }),
     ).resolves.toEqual({ key: "organizationMode", value: "machine" });
     await expect(
@@ -73,11 +74,15 @@ describe("thread-list preferences rpc", () => {
     expect(harness.realtimeSignals).toEqual([
       {
         channel: "preferences",
-        payload: { key: "showProviderIcons", value: false },
+        payload: { key: "showProviderIcons", value: false, origin: null },
       },
       {
         channel: "preferences",
-        payload: { key: "organizationMode", value: "machine" },
+        payload: {
+          key: "organizationMode",
+          value: "machine",
+          origin: "window-a",
+        },
       },
     ]);
   });
@@ -373,7 +378,7 @@ it("validates lifecycle selection through CLI and RPC and broadcasts it", async 
   ).resolves.toEqual(["archived"]);
   expect(harness.realtimeSignals).toContainEqual({
     channel: "preferences",
-    payload: { key: "threadLifecycles", value: ["archived"] },
+    payload: { key: "threadLifecycles", value: ["archived"], origin: null },
   });
 });
 
@@ -582,7 +587,7 @@ describe("queued and completed thread promotion", () => {
         preferences: {
           manualThreadOrder: ["queued", "existing", "other"],
           chronologicalSort: "manual",
-          groupByReadStatus: false,
+          groupByReadStatus: true,
         },
       });
     },

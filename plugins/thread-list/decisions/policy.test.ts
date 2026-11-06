@@ -127,6 +127,7 @@ describe("quick-decision lifecycle", () => {
           {
             id: "format",
             prompt: "CSV or Excel?",
+            required: true,
             multiSelect: false,
             allowFreeText: true,
             options: [

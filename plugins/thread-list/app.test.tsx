@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { testPanelController } from "./app/model/test-panel.js";
 import {
   act,
   cleanup,
@@ -190,6 +191,7 @@ describe("thread-list plugin", () => {
       threadId: "thr_parent",
       projectId: "proj_app",
       openPanel: () => false,
+      experimental_panel: testPanelController,
     };
     const selected = document.querySelector<HTMLAnchorElement>(
       'a[data-sidebar-thread-id="thr_later"]',
@@ -257,6 +259,7 @@ describe("thread-list plugin", () => {
         threadId: "thr_later",
         projectId: "proj_app",
         openPanel: () => false,
+        experimental_panel: testPanelController,
       };
       await waitFor(() =>
         expect(threadCompletionCommand.isAvailable?.(context)).toBe(true),
@@ -299,6 +302,7 @@ describe("thread-list plugin", () => {
         threadId: "thr_parent",
         projectId: "proj_app",
         openPanel: () => false,
+        experimental_panel: testPanelController,
       };
       const selected = document.querySelector<HTMLAnchorElement>(
         'a[data-sidebar-thread-id="thr_later"]',
@@ -370,7 +374,12 @@ describe("thread-list plugin", () => {
     const command = threadPipelineCommands.find(
       (command) => command.id === id,
     )!;
-    const context = { threadId, projectId: "proj_app", openPanel: () => false };
+    const context = {
+      threadId,
+      projectId: "proj_app",
+      openPanel: () => false,
+      experimental_panel: testPanelController,
+    };
     await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
     await act(async () => command.run(context));
     expect(update).toHaveBeenCalledWith({ threadId, sectionId });
@@ -391,7 +400,12 @@ describe("thread-list plugin", () => {
     const command = threadPipelineCommands.find(
       (command) => command.id === id,
     )!;
-    const context = { threadId, projectId: "proj_app", openPanel: () => false };
+    const context = {
+      threadId,
+      projectId: "proj_app",
+      openPanel: () => false,
+      experimental_panel: testPanelController,
+    };
     await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
     await act(async () => command.run(context));
     expect(update).not.toHaveBeenCalled();
@@ -411,6 +425,7 @@ describe("thread-list plugin", () => {
       threadId: "thr_parent",
       projectId: "proj_app",
       openPanel: () => false,
+      experimental_panel: testPanelController,
     };
     await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
     await act(async () => command.run(context));
@@ -428,6 +443,7 @@ describe("thread-list plugin", () => {
         input: {
           key: "manualThreadOrder",
           value: ["thr_personal", "thr_parent"],
+          origin: expect.any(String),
         },
       }),
     );
@@ -467,6 +483,45 @@ describe("thread-list plugin", () => {
       "thr_child",
     ]);
   });
+
+  it.each([
+    ["empty", true],
+    ["empty", false],
+    ["hidden", false],
+    ["pinned", false],
+  ] as const)(
+    "with only %s threads, shows the project group when showEmptyProjects is %s",
+    async (kind, showEmptyProjects) => {
+      setPreferencesMirrorStorageForTest(null);
+      renderList(
+        { organizationMode: "project", showEmptyProjects },
+        {
+          sidebarThreads: {
+            projects: PROJECTS,
+            sections: [],
+            threads: [
+              ...THREADS.filter((thread) => thread.projectId === "proj_app"),
+              ...(kind === "empty"
+                ? []
+                : [
+                    makeSidebarThread({
+                      id: "thr_web_only",
+                      projectId: "proj_web",
+                      title: "Web only",
+                      isHidden: kind === "hidden",
+                      isPinned: kind === "pinned",
+                      pinnedAt: kind === "pinned" ? 10 : null,
+                    }),
+                  ]),
+            ],
+          },
+        },
+      );
+      await screen.findByText("Parent thread");
+      expect(sectionHeaders()).toContain("App");
+      expect(sectionHeaders().includes("Web")).toBe(showEmptyProjects);
+    },
+  );
 
   it("shows the navigation skeleton until preferences load", () => {
     setPreferencesMirrorStorageForTest(null);

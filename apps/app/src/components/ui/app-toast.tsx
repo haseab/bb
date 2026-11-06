@@ -21,7 +21,7 @@ import {
   registerToastShortcuts,
   removeToastShortcuts,
 } from "./toast-shortcuts";
-import { withSonnerToast } from "./app-toast-runtime";
+import { dismissSonnerToast, withSonnerToast } from "./app-toast-runtime";
 
 export type AppToastTone =
   | "message"
@@ -114,7 +114,7 @@ function dismissToast(id: number | string | undefined): void {
     return;
   }
   removeToastShortcuts(id);
-  withSonnerToast((sonnerToast) => sonnerToast.dismiss(id));
+  dismissSonnerToast(id);
 }
 
 function AppToastActionButton({
@@ -375,36 +375,38 @@ function showAppToast({
         });
 
   const toastId = sonnerOptions.id ?? `app-toast-${(nextToastId += 1)}`;
-  withSonnerToast((sonnerToast) =>
-    sonnerToast.custom(
-      (id) => (
-        <AppToastContent
-          action={action}
-          cancel={cancel}
-          description={description}
-          dismissible={dismissible}
-          id={id}
-          notificationId={notificationId}
-          title={title}
-          tone={tone}
-        />
+  withSonnerToast(
+    (sonnerToast) =>
+      sonnerToast.custom(
+        (id) => (
+          <AppToastContent
+            action={action}
+            cancel={cancel}
+            description={description}
+            dismissible={dismissible}
+            id={id}
+            notificationId={notificationId}
+            title={title}
+            tone={tone}
+          />
+        ),
+        {
+          ...sonnerOptions,
+          id: toastId,
+          className: cn("bb-app-toast", className),
+          dismissible,
+          duration: nextDuration,
+          onDismiss: (value) => {
+            removeToastShortcuts(toastId);
+            sonnerOptions.onDismiss?.(value);
+          },
+          onAutoClose: (value) => {
+            removeToastShortcuts(toastId);
+            sonnerOptions.onAutoClose?.(value);
+          },
+        },
       ),
-      {
-        ...sonnerOptions,
-        id: toastId,
-        className: cn("bb-app-toast", className),
-        dismissible,
-        duration: nextDuration,
-        onDismiss: (value) => {
-          removeToastShortcuts(toastId);
-          sonnerOptions.onDismiss?.(value);
-        },
-        onAutoClose: (value) => {
-          removeToastShortcuts(toastId);
-          sonnerOptions.onAutoClose?.(value);
-        },
-      },
-    ),
+    toastId,
   );
   return toastId;
 }
@@ -426,7 +428,7 @@ const showLoadingToast: AppToastMethod = (title, options) =>
 
 function dismissAppToast(id?: number | string): void {
   removeToastShortcuts(id);
-  withSonnerToast((sonnerToast) => sonnerToast.dismiss(id));
+  dismissSonnerToast(id);
 }
 
 export const appToast = {

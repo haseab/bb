@@ -30,25 +30,21 @@ import {
   useSectionDropTargetState,
 } from "../dnd/useSectionDropTargetState.js";
 import type { SidebarSortableDragBindings } from "@/components/ui/sortable-motion";
+import { experimental_ThreadStatusGlyph as ThreadStatusGlyph } from "@get-bb/plugin-sdk/app";
+import type { SidebarThread } from "../model/sidebar-thread.js";
 import {
-  NO_COLLAPSED_CHILD_ACTIVITY,
-  type CollapsedChildActivity,
-} from "../model/thread-activity.js";
-import { CollapsedThreadStatusGlyph } from "../rows/ThreadRow.js";
-import {
+  NO_HIDDEN_THREADS,
+  useHiddenThreadsStatus,
+  usePluginThreadRowStatusForThreads,
   useThreadGroupSplitIndicator,
-  type ThreadSplitIndicatorTarget,
 } from "./groupRollups.js";
 import { SplitPaneMiniMap } from "@/components/ui/split-pane-mini-map";
 import { COARSE_POINTER_ROW_ACTION_SIZE_CLASS } from "@/components/ui/coarse-pointer-sizing";
-import { usePluginThreadRowStatusForThreads } from "./groupRollups.js";
 
 import {
   VisibleSidebarThreads,
   useVisibleSidebarThreads,
 } from "./VisibleSidebarThreads.js";
-
-const EMPTY_SPLIT_INDICATOR_THREADS: readonly ThreadSplitIndicatorTarget[] = [];
 
 function stopActionsClick(event: MouseEvent<HTMLSpanElement>) {
   event.stopPropagation();
@@ -73,8 +69,7 @@ export interface TopLevelSidebarSectionProps {
   actionsMobileAlways?: boolean;
   actionsOpen?: boolean;
   collapseControl?: TopLevelSidebarSectionCollapseControl;
-  collapsedActivity?: CollapsedChildActivity;
-  collapsedThreads?: readonly ThreadSplitIndicatorTarget[];
+  collapsedThreads?: readonly SidebarThread[];
   dragBindings?: SidebarSortableDragBindings;
   sectionRef?: (element: HTMLDivElement | null) => void;
   sectionStyle?: CSSProperties;
@@ -96,29 +91,32 @@ export function TopLevelSidebarSection({
   actionsMobileAlways = false,
   actionsOpen = false,
   collapseControl,
-  collapsedActivity,
-  collapsedThreads = EMPTY_SPLIT_INDICATOR_THREADS,
+  collapsedThreads,
   dragBindings,
   sectionRef,
   sectionStyle,
   consumeClickSuppression,
   isDropTargetActive = false,
 }: TopLevelSidebarSectionProps) {
-  const visibleThreads = useVisibleSidebarThreads(collapsedThreads);
+  const visibleThreads = useVisibleSidebarThreads(
+    collapsedThreads ?? NO_HIDDEN_THREADS,
+  );
   const hasVisiblePreview =
     collapseControl?.isCollapsed === true && visibleThreads.length > 0;
   const threadDropState = useSectionDropTargetState(dropParentKey);
+  const isCollapsed = collapseControl?.isCollapsed === true;
+  const rollupThreads = collapsedThreads ?? NO_HIDDEN_THREADS;
   const collapsedSplitIndicator = useThreadGroupSplitIndicator(
-    collapsedThreads,
-    collapseControl?.isCollapsed === true,
+    rollupThreads,
+    isCollapsed,
   );
-  const pluginStatus = usePluginThreadRowStatusForThreads(collapsedThreads);
+  const pluginStatus = usePluginThreadRowStatusForThreads(rollupThreads);
+  const rollup = useHiddenThreadsStatus(
+    isCollapsed ? rollupThreads : NO_HIDDEN_THREADS,
+    pluginStatus,
+  );
   const showCollapsedActivity =
-    !status &&
-    collapseControl?.isCollapsed === true &&
-    (collapsedSplitIndicator.miniMap !== null ||
-      collapsedActivity !== undefined ||
-      pluginStatus !== null);
+    !status && isCollapsed && collapsedThreads !== undefined;
   const collapsedActivityIndicator = showCollapsedActivity ? (
     <span
       data-sidebar-collapsed-activity-edge=""
@@ -133,16 +131,14 @@ export function TopLevelSidebarSection({
         <SplitPaneMiniMap
           slots={collapsedSplitIndicator.miniMap}
           label={`${label} — contains a thread open in split`}
-          isWorking={
-            collapsedActivity?.working || pluginStatus?.tone === "running"
-          }
+          isWorking={rollup.isWorking}
         />
-      ) : collapsedActivity || pluginStatus ? (
-        <CollapsedThreadStatusGlyph
-          activity={collapsedActivity ?? NO_COLLAPSED_CHILD_ACTIVITY}
-          pluginStatus={pluginStatus}
+      ) : (
+        <ThreadStatusGlyph
+          indicator={rollup.indicator}
+          rowStatus={rollup.rowStatus}
         />
-      ) : null}
+      )}
     </span>
   ) : null;
   const handleClickCapture = useCallback<MouseEventHandler<HTMLDivElement>>(
@@ -302,7 +298,7 @@ export function TopLevelSidebarSection({
       </SidebarStickyTier>
       {collapseControl?.isCollapsed ? (
         <VisibleSidebarThreads
-          threads={collapsedThreads}
+          threads={collapsedThreads ?? NO_HIDDEN_THREADS}
           label={label}
           onShowAll={collapseControl.onToggleCollapsed}
         />

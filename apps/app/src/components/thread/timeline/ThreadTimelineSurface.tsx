@@ -28,9 +28,6 @@ import type {
   ThreadTimelineInlineMessageEditor,
   ThreadTimelineAddToChatHandler,
   ThreadTimelineConsumerMessageAction,
-  ThreadTimelineLinkHandler,
-  ThreadTimelineLocalFileLinkHandler,
-  ThreadTimelineOpenPluginPanelHandler,
   ThreadTimelineUnreadDividerPlacement,
 } from "./types.js";
 
@@ -58,9 +55,6 @@ export interface ThreadTimelineSurfaceProps {
   consumerMessageActions?: readonly ThreadTimelineConsumerMessageAction[];
   includePluginMessageActions?: boolean;
   onLoadOlderRows?: () => Promise<void> | void;
-  onOpenLink?: ThreadTimelineLinkHandler;
-  onOpenLocalFileLink?: ThreadTimelineLocalFileLinkHandler;
-  onOpenPluginPanel?: ThreadTimelineOpenPluginPanelHandler;
   onTitleAction?: TimelineTitleActionResolver;
   projectId?: string;
   resolveMentionLink?: PromptMentionLinkResolver;
@@ -75,7 +69,6 @@ export interface ThreadTimelineSurfaceProps {
   threadRuntimeDisplayStatus: ThreadRuntimeDisplayStatus;
   unreadDividerAutoScroll?: boolean;
   unreadDividerPlacement?: ThreadTimelineUnreadDividerPlacement | null;
-  workspaceRootPath: string | undefined;
 }
 
 interface BuildStopRequestedTimelineRowArgs {
@@ -159,9 +152,6 @@ export function ThreadTimelineSurface({
   consumerMessageActions,
   includePluginMessageActions,
   onLoadOlderRows,
-  onOpenLink,
-  onOpenLocalFileLink,
-  onOpenPluginPanel,
   onTitleAction,
   projectId,
   resolveMentionLink,
@@ -176,7 +166,6 @@ export function ThreadTimelineSurface({
   threadRuntimeDisplayStatus,
   unreadDividerAutoScroll,
   unreadDividerPlacement,
-  workspaceRootPath,
 }: ThreadTimelineSurfaceProps) {
   const userOnly = useAtomValue(threadUserMessagesOnlyAtom(threadId));
   const visibleRows = useMemo(
@@ -295,9 +284,6 @@ export function ThreadTimelineSurface({
             onSelectionAddToChat={onSelectionAddToChat}
             consumerMessageActions={consumerMessageActions}
             includePluginMessageActions={includePluginMessageActions}
-            onOpenLink={onOpenLink}
-            onOpenLocalFileLink={onOpenLocalFileLink}
-            onOpenPluginPanel={onOpenPluginPanel}
             onTitleAction={onTitleAction}
             projectId={projectId}
             resolveMentionLink={resolveMentionLink}
@@ -311,7 +297,6 @@ export function ThreadTimelineSurface({
             threadRuntimeDisplayStatus={threadRuntimeDisplayStatus}
             unreadDividerAutoScroll={unreadDividerAutoScroll}
             unreadDividerPlacement={unreadDividerPlacement}
-            workspaceRootPath={workspaceRootPath}
           />
         ) : null}
         {hostConnectionNotice ? (

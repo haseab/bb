@@ -225,6 +225,7 @@ export function makeThreadQueuedMessage(
     waitingOn: null,
     failureReason: null,
     payload: { kind: "inline" },
+    systemNotice: null,
     editable: true,
     createdAt: 0,
     updatedAt: 0,

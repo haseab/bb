@@ -1,14 +1,16 @@
+import { migrate } from "./helpers/migrate-with-fork-extensions.js";
 import { describe, expect, it } from "vitest";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import {
   createConnection,
   createThread,
-  migrate,
   noopNotifier,
   type DbConnection,
 } from "../src/index.js";
 import {
   dropThreadParentNotificationsColumn,
+  dropQueuedMessageDeliveryColumns,
+  dropThreadStatusChangedAtColumn,
   rewindQueuedMessageStateMigration,
 } from "./helpers/rewind.js";
 
@@ -57,6 +59,8 @@ function rewoundDatabase(): { db: DbConnection; threadId: string } {
   });
   rewindQueuedMessageStateMigration(db);
   dropThreadParentNotificationsColumn(db);
+  dropQueuedMessageDeliveryColumns(db);
+  dropThreadStatusChangedAtColumn(db);
   return { db, threadId: thread.id };
 }
 

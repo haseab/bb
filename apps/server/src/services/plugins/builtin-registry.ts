@@ -166,6 +166,11 @@ export const BUILTIN_PLUGINS = [
     defaultEnabled: true,
   },
   {
+    name: "git",
+    pluginId: "bb--git",
+    defaultEnabled: true,
+  },
+  {
     name: "github-pr-status",
     pluginId: "bb--github-pr-status",
     defaultEnabled: true,
@@ -228,6 +233,11 @@ export const BUILTIN_PLUGINS = [
   {
     name: "composer",
     pluginId: "bb--composer",
+    defaultEnabled: true,
+  },
+  {
+    name: "github-star",
+    pluginId: "bb--github-star",
     defaultEnabled: true,
   },
 ].map((plugin): BundledPluginDefinition => ({

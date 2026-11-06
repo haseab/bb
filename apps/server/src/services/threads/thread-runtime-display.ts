@@ -23,6 +23,7 @@ import type {
   ThreadQueuedWork,
   ThreadRuntimeState,
   ThreadStatus,
+  ThreadTimelineGoal,
   ThreadWithRuntime,
 } from "@bb/domain";
 import {
@@ -455,6 +456,18 @@ function buildThreadPromptBannerActivityByThreadId(
   return result;
 }
 
+export function getThreadTimelineGoal(
+  deps: ThreadPromptBannerDeps,
+  thread: Thread,
+): ThreadTimelineGoal | null {
+  return extractThreadTimelineGoal(
+    listLatestThreadStateEventRowsByThreadIds(deps.db, {
+      threadIds: [thread.id],
+      kind: LEGACY_CODEX_GOAL_EXTENSION_KIND,
+    }).map(toThreadEventWithMeta),
+  );
+}
+
 export function getThreadPromptBannerActivity(
   deps: ThreadPromptBannerDeps,
   thread: Thread,
@@ -524,11 +537,11 @@ function buildThreadQueuedWorkByThreadId(
   for (const counts of listQueuedThreadMessageCountsByThreadIds(deps.db, {
     threadIds: threads.map((thread) => thread.id),
   })) {
-    if (counts.queuedMessageCount === 0) continue;
-    result.set(
-      counts.threadId,
-      counts.failedQueuedMessageCount > 0 ? "failed" : "waiting",
-    );
+    if (counts.failedQueuedMessageCount > 0) {
+      result.set(counts.threadId, "failed");
+    } else if (counts.userQueuedMessageCount > 0) {
+      result.set(counts.threadId, "waiting");
+    }
   }
   return result;
 }

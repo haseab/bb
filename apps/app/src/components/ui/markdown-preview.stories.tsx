@@ -23,6 +23,7 @@ export function LocalFileLinks() {
         ].join("\n\n")}
         linkRouting={{
           localFile: {
+            hostId: null,
             absoluteLinks: { kind: "trusted-host" },
             relativeLinks: { baseDir: "/workspace", rootPath: "/workspace" },
             onOpenLink: () => true,
@@ -52,6 +53,7 @@ export function LinksAndInlineCode() {
             ].join("\n\n")}
             linkRouting={{
               localFile: {
+                hostId: "host_preview",
                 absoluteLinks: { kind: "trusted-host" },
                 relativeLinks: {
                   baseDir: "/workspace",

@@ -1,6 +1,9 @@
 import { createDesktopAppToggle } from "./desktop-app-toggle.js";
+import { resolveBbAppRuntimeState } from "../../../packages/bb-app/src/launcher.js";
+import { pathToFileURL } from "node:url";
+import { spawnHostProcess as spawn, hostToolchain } from "@bb/process-utils";
+import { openApplicationUrl } from "./application-url.js";
 import { createDesktopLogger } from "./desktop-logger.js";
-import { spawn } from "node:child_process";
 import { attachServerUpdateControl } from "./server-update-control.js";
 import { registerServerChoiceIpc } from "./server-choice-ipc.js";
 import { randomUUID } from "node:crypto";
@@ -59,6 +62,7 @@ import {
 } from "@bb/server-contract";
 import { z } from "zod";
 import { registerDesktopClipboardIpc } from "./desktop-clipboard.js";
+import { registerDesktopAttentionIpc } from "./desktop-attention.js";
 import { registerDesktopWindowFocusIpc } from "./desktop-window-focus.js";
 import {
   assertPathExists,
@@ -210,6 +214,7 @@ import {
   BB_DESKTOP_INFO_CHANGED_CHANNEL,
   BB_DESKTOP_INSTALL_UPDATE_CHANNEL,
   BB_DESKTOP_OPEN_EXTERNAL_URL_CHANNEL,
+  BB_DESKTOP_OPEN_APPLICATION_URL_CHANNEL,
   BB_DESKTOP_SET_THEME_CHANNEL,
   BB_DESKTOP_ZOOM_COMMAND_CHANNEL,
 } from "./desktop-update-ipc.js";
@@ -264,7 +269,6 @@ import {
   BB_DESKTOP_BROWSER_OPEN_FULL_DISK_ACCESS_SETTINGS_CHANNEL,
 } from "./desktop-browser-ipc.js";
 import { parseDesktopSystemConfig } from "./desktop-system-config.js";
-import { ensurePackagedUserShellPath } from "./desktop-shell-path.js";
 import { resolveDesktopReloadShortcut } from "./desktop-reload-shortcut.js";
 import {
   createLogTailer,
@@ -294,11 +298,16 @@ import {
   type RuntimeOwnership,
   type WindowStateKey,
 } from "./types.js";
+import {
+  createWindowsInstallerWaitCommand,
+  waitForWindowsInstaller,
+} from "./windows-installer.js";
 
 const OWNED_RUNTIME_STOP_TIMEOUT_MS = 6_000;
 const OWNED_RUNTIME_KILL_TIMEOUT_MS = 1_000;
 const FOREIGN_RUNTIME_STOP_TIMEOUT_MS = 15_000;
 const FOREIGN_RUNTIME_KILL_TIMEOUT_MS = 3_000;
+const WINDOWS_INSTALLER_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
 const REMOTE_SYSTEM_CONFIG_POLL_INTERVAL_MS = 5 * 60 * 1000;
 const CONNECT_ACCOUNT_API_HANDLE = "connect";
 
@@ -369,10 +378,6 @@ interface ServerProbeStartupRaceResult {
 interface ResolveDataDirFromEnvArgs {
   env: NodeJS.ProcessEnv;
   homeDir: string;
-}
-
-interface ResolveDesktopServerUrlArgs {
-  env: NodeJS.ProcessEnv;
 }
 
 interface ResolveDesktopWindowUrlArgs {
@@ -454,20 +459,6 @@ let localServerMove: DesktopServerMove | null = null;
 let serverMovedWatcher: ServerMovedWatcher | null = null;
 let serverUrlDialogPreloadPath: string | null = null;
 let existingServerDialogPreloadPath: string | null = null;
-
-function resolveDesktopServerUrl(args: ResolveDesktopServerUrlArgs): string {
-  const rawPort = args.env.BB_SERVER_PORT?.trim();
-  if (rawPort === undefined || rawPort.length === 0) {
-    return DEFAULT_BB_SERVER_URL;
-  }
-
-  const port = Number(rawPort);
-  if (Number.isInteger(port) && port >= 1 && port <= 65_535) {
-    return `http://127.0.0.1:${port}`;
-  }
-
-  throw new Error("BB_SERVER_PORT must be a valid TCP port");
-}
 
 function resolveDesktopWindowUrl(args: ResolveDesktopWindowUrlArgs): string {
   const rawAppUrl = args.env.BB_DESKTOP_APP_URL?.trim();
@@ -771,13 +762,19 @@ function listMenuConnectServers(): ConnectServerRef[] {
 }
 
 function listServerChoices() {
-  return buildDesktopServerChoices(serverTargetStore, listMenuConnectServers());
+  return buildDesktopServerChoices(
+    serverTargetStore,
+    listMenuConnectServers(),
+    builtinServerUrl,
+  );
 }
 
 function buildMenuServerItems(connectServers: ConnectServerRef[]) {
-  return buildDesktopServerChoices(serverTargetStore, connectServers).map(
-    ({ active, id, name }) => ({ checked: active, id, name }),
-  );
+  return buildDesktopServerChoices(
+    serverTargetStore,
+    connectServers,
+    builtinServerUrl,
+  ).map(({ active, id, name }) => ({ checked: active, id, name }));
 }
 
 function buildServerMenuArgs(): ServerMenuArgs {
@@ -1500,11 +1497,13 @@ function connectMovedMachine(args: {
         desktopLogger.info(message);
       },
       async startLocalRuntime() {
-        await spawnOwnedRuntime({
-          bridgePath: args.bridgePath,
-          serverUrl: builtinServerUrl,
-          userDataPath: args.userDataPath,
-        });
+        reportOwnedRuntimeExit(
+          await spawnOwnedRuntime({
+            bridgePath: args.bridgePath,
+            serverUrl: builtinServerUrl,
+            userDataPath: args.userDataPath,
+          }),
+        );
       },
     });
     refreshApplicationMenu();
@@ -1637,6 +1636,7 @@ async function handleWatchedServerMove(move: DesktopServerMove): Promise<void> {
       fetchImpl: (input, init) => net.fetch(input, init),
       intervalMs: SERVER_MOVE_DESTINATION_INTERVAL_MS,
       isCancelled: () => quitting || serverTargetGeneration !== generation,
+      moveId: move.moveId,
       serverUrl: move.target.url,
       timeoutMs: SERVER_MOVE_DESTINATION_TIMEOUT_MS,
     });
@@ -2225,6 +2225,19 @@ async function loadLoadingView(): Promise<void> {
   });
 }
 
+async function loadWindowsInstallerWaitView(): Promise<void> {
+  bbAppLoaded = false;
+  await loadWindowUrl({
+    url: createLocalViewUrl({
+      viewModel: {
+        kind: "loading",
+        message: "bb opens when the installer is done.",
+        title: "Finishing the bb update",
+      },
+    }),
+  });
+}
+
 async function loadStartupError(args: LoadStartupErrorArgs): Promise<void> {
   desktopLogger.error(
     args.logs.length === 0
@@ -2282,7 +2295,6 @@ async function createApplicationWindow(
     initialUrl: args.initialUrl,
     stateKey: args.stateKey,
   });
-  registerApplicationWindow(browserWindow);
   if (bbAppLoaded && shouldOpenDevTools()) {
     browserWindow.webContents.openDevTools({ mode: "detach" });
   }
@@ -2351,6 +2363,9 @@ async function finishQuit(): Promise<void> {
         `Could not save desktop window state: ${String(error)}`,
       ),
     );
+  for (const browserWindow of BrowserWindow.getAllWindows()) {
+    browserWindow.hide();
+  }
   await stopOwnedRuntime();
 }
 
@@ -2388,6 +2403,7 @@ function registerDesktopUpdateIpc(): void {
       desktopLogger.error(`Could not switch server: ${String(error)}`),
   });
   registerDesktopWindowFocusIpc(applicationWindowWebContentsIds);
+  registerDesktopAttentionIpc(applicationWindowWebContentsIds);
   registerDesktopClipboardIpc(applicationWindowWebContentsIds);
   ipcMain.on(BB_DESKTOP_ZOOM_COMMAND_CHANNEL, (event, payload: unknown) => {
     const parsed = bbDesktopZoomCommandSchema.safeParse(payload);
@@ -2477,6 +2493,20 @@ function registerDesktopUpdateIpc(): void {
       resolveApplicationWindow(event.sender)?.close();
     }
   });
+  ipcMain.handle(
+    BB_DESKTOP_OPEN_APPLICATION_URL_CHANNEL,
+    async (event, value: unknown) => {
+      const owner = resolveApplicationWindow(event.sender);
+      if (
+        owner === null ||
+        owner.webContents !== event.sender ||
+        event.senderFrame !== event.sender.mainFrame
+      )
+        throw new Error("Application window is unavailable.");
+      await openApplicationUrl(value);
+    },
+  );
+
   ipcMain.on(
     BB_DESKTOP_OPEN_EXTERNAL_URL_CHANNEL,
     (_event, payload: unknown) => {
@@ -2581,9 +2611,14 @@ async function spawnOwnedRuntime(
     userDataPath: args.userDataPath,
   });
   setCurrentRuntime(runtime);
-
-  void bbProcess.exit.then((exit) => {
+  void bbProcess.exit.then(() => {
     void clearOwnedRuntimePidFile({ userDataPath: args.userDataPath });
+  });
+  return { bbProcess, runtime };
+}
+
+function reportOwnedRuntimeExit({ bbProcess, runtime }: OwnedRuntime): void {
+  void bbProcess.exit.then((exit) => {
     if (quitting || currentRuntime !== runtime) {
       return;
     }
@@ -2603,13 +2638,37 @@ async function spawnOwnedRuntime(
       title: "bb stopped",
     });
   });
-  return { bbProcess, runtime };
+}
+
+async function waitForWindowsInstallerToFinish(): Promise<boolean> {
+  if (!app.isPackaged || process.platform !== "win32") {
+    return false;
+  }
+  const result = await waitForWindowsInstaller({
+    command: createWindowsInstallerWaitCommand({
+      appId: DESKTOP_RELEASE_INFO.appId,
+      systemRoot: process.env.SystemRoot,
+      timeoutMs: WINDOWS_INSTALLER_WAIT_TIMEOUT_MS,
+    }),
+    onWaiting: () => {
+      desktopLogger.info(
+        "[desktop] bb-app exited while a bb installer is running; waiting for it to finish",
+      );
+      void loadWindowsInstallerWaitView();
+    },
+    timeoutMs: WINDOWS_INSTALLER_WAIT_TIMEOUT_MS,
+  });
+  if (result !== "not-running") {
+    desktopLogger.info(`[desktop] bb installer wait ended: ${result}`);
+  }
+  return result === "finished" && !quitting;
 }
 
 async function startOwnedRuntime(
   args: StartOwnedRuntimeArgs,
 ): Promise<DesktopRuntime | null> {
-  const { bbProcess, runtime } = await spawnOwnedRuntime(args);
+  const ownedRuntime = await spawnOwnedRuntime(args);
+  const { bbProcess, runtime } = ownedRuntime;
 
   const raceResult = await Promise.race<StartupRaceResult>([
     waitForCompatibleServer({
@@ -2627,6 +2686,10 @@ async function startOwnedRuntime(
   ]);
 
   if (raceResult.kind === "process-exited") {
+    setCurrentRuntime(null);
+    if (await waitForWindowsInstallerToFinish()) {
+      return startOwnedRuntime(args);
+    }
     await loadStartupError({
       details: `bb-app exited before the server was ready with ${formatExitResult(
         raceResult.exit,
@@ -2635,11 +2698,11 @@ async function startOwnedRuntime(
       actions: [],
       title: "Could not start bb",
     });
-    setCurrentRuntime(null);
     return null;
   }
 
   if (raceResult.result.kind === "compatible") {
+    reportOwnedRuntimeExit(ownedRuntime);
     return runtime;
   }
 
@@ -2836,13 +2899,6 @@ async function initializeRuntime(args: InitializeRuntimeArgs): Promise<void> {
 }
 
 async function runDesktopApp(): Promise<void> {
-  ensurePackagedUserShellPath({
-    env: process.env,
-    isPackaged: app.isPackaged,
-    logger: desktopLogger,
-    platform: process.platform,
-  });
-
   const applicationName = app.isPackaged
     ? DESKTOP_RELEASE_INFO.applicationName
     : "bb-dev";
@@ -2906,6 +2962,15 @@ async function runDesktopApp(): Promise<void> {
     },
   });
 
+  app.setAppUserModelId(
+    DESKTOP_RELEASE_CHANNEL === "nightly"
+      ? "dev.bb.desktop.nightly"
+      : "dev.bb.desktop",
+  );
+  if (app.isPackaged) {
+    await hostToolchain.refresh();
+    Object.assign(process.env, hostToolchain.environment());
+  }
   await app.whenReady();
   desktopAppToggle = createDesktopAppToggle({
     platform: process.platform,
@@ -2967,7 +3032,15 @@ async function runDesktopApp(): Promise<void> {
     "dist",
     "server-url-dialog-preload.cjs",
   );
-  const serverUrl = resolveDesktopServerUrl({ env: process.env });
+  const {
+    context: { serverUrl },
+  } = await resolveBbAppRuntimeState({
+    entrypointUrl: pathToFileURL(bridgePath).href,
+    env: process.env,
+    homeDir: homedir(),
+    options: { help: false },
+    serverUrlMode: "local",
+  });
   builtinServerUrl = serverUrl;
   desktopBridgePath = bridgePath;
   const desktopVersion = getDesktopVersion(process.env.BB_DESKTOP_VERSION);
@@ -3347,6 +3420,7 @@ async function runDesktopApp(): Promise<void> {
     openExternalUrl(openArgs) {
       void shell.openExternal(openArgs.url);
     },
+    onWindowCreated: registerApplicationWindow,
     preloadPath,
     userDataPath,
   });
@@ -3354,12 +3428,9 @@ async function runDesktopApp(): Promise<void> {
 
   refreshApplicationMenu();
   await loadLoadingView();
-  const restoredWindows = await desktopWindowFactory.restoreSavedWindows({
+  await desktopWindowFactory.restoreSavedWindows({
     initialUrl: currentWindowUrl,
   });
-  for (const browserWindow of restoredWindows) {
-    registerApplicationWindow(browserWindow);
-  }
   await activateLocalServerMoveIfLocked();
   if (
     serverTargetStore.getTarget().kind === "builtin" &&

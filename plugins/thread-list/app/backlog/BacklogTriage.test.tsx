@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { testPanelController } from "../model/test-panel.js";
 import {
   act,
   cleanup,
@@ -40,6 +41,7 @@ const context = {
   threadId: "queued",
   projectId: "project",
   openPanel: () => false,
+  experimental_panel: testPanelController,
 };
 function setup(fails = false, compact = false) {
   const threads = [
@@ -285,6 +287,7 @@ describe("Backlog follow-up triage", () => {
         data: undefined,
         sdk: useSdk(),
         navigate: useBbNavigate(),
+        experimental_panel: testPanelController,
       });
       return (
         <button

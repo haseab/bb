@@ -104,7 +104,6 @@ it("preselects No project first and supports arrow navigation", async () => {
 it("supports a personal workspace and changing projects without losing the message", async () => {
   render(<Flow />);
   await openPicker();
-  fireEvent.change(search(), { target: { value: "No project" } });
   fireEvent.keyDown(search(), { key: "Enter" });
   await screen.findByText("Personal workspace");
   fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
@@ -122,14 +121,63 @@ it("supports a personal workspace and changing projects without losing the messa
   ).toBe("Keep this draft");
 });
 
-it("clears an empty search result with Escape and keeps the picker open", async () => {
+it.each(["", "Alpha", "zzzzzz"])(
+  "dismisses project search with Escape and keeps the current project and draft (%j)",
+  async (query) => {
+    const select = vi.fn(async () => {});
+    render(<Flow onSelectProject={select} />);
+    await openPicker();
+    fireEvent.change(search(), { target: { value: query } });
+    fireEvent.keyDown(search(), { key: "Escape" });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("textbox", { name: "Message" }),
+      ),
+    );
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(
+      screen.queryByRole("combobox", { name: "Search projects" }),
+    ).toBeNull();
+    expect(screen.getByText("BB")).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty(
+      "value",
+      "Existing draft",
+    );
+    expect(select).not.toHaveBeenCalled();
+  },
+);
+
+it("preserves an edited draft when canceling a project change and reopens with a clear search", async () => {
   render(<Flow />);
   await openPicker();
-  fireEvent.change(search(), { target: { value: "zzzzzz" } });
-  expect(screen.getByText("No projects found. Try another name.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("option", { name: /No project/ }));
+  const composer = await screen.findByRole("textbox", { name: "Message" });
+  fireEvent.change(composer, { target: { value: "Keep this draft" } });
+  fireEvent.click(screen.getByRole("button", { name: "Change project" }));
+  await openPicker();
+  fireEvent.change(search(), { target: { value: "Alpha" } });
   fireEvent.keyDown(search(), { key: "Escape" });
-  expect((search() as HTMLInputElement).value).toBe("");
+  expect(screen.getByText("Personal workspace")).toBeTruthy();
+  expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty(
+    "value",
+    "Keep this draft",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Change project" }));
+  await openPicker();
+  expect(search()).toHaveProperty("value", "");
   expect(screen.getByRole("option", { name: /Alpha Web/ })).toBeTruthy();
+});
+
+it("cancels the delayed dropdown opening when Escape is pressed immediately", () => {
+  vi.useFakeTimers();
+  render(<Flow />);
+  fireEvent.keyDown(search(), { key: "Escape" });
+  act(() => vi.advanceTimersByTime(200));
+  expect(screen.queryByRole("listbox")).toBeNull();
+  expect(
+    screen.queryByRole("combobox", { name: "Search projects" }),
+  ).toBeNull();
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy();
 });
 
 it("keeps the picker usable after a failed project change", async () => {
@@ -246,3 +294,89 @@ it.each([projects, undefined])(
     ).toBeTruthy();
   },
 );
+
+it("hides No project while searching and selects the first matching project for keyboard navigation", async () => {
+  const select = vi.fn(async () => {});
+  render(
+    <Flow
+      onSelectProject={select}
+      projects={[
+        { id: "nocturne", name: "Nocturne" },
+        { id: "northstar", name: "Northstar" },
+        { id: PERSONAL_PROJECT_ID, name: "Personal" },
+      ]}
+    />,
+  );
+  await openPicker();
+  fireEvent.change(search(), { target: { value: "No" } });
+  await waitFor(() =>
+    expect(screen.queryByRole("option", { name: "No project" })).toBeNull(),
+  );
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("option", { name: "Nocturne" })
+        .getAttribute("aria-selected"),
+    ).toBe("true"),
+  );
+  fireEvent.keyDown(search(), { key: "ArrowDown" });
+  expect(
+    screen
+      .getByRole("option", { name: "Northstar" })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  fireEvent.keyDown(search(), { key: "ArrowUp" });
+  expect(
+    screen
+      .getByRole("option", { name: "Nocturne" })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  fireEvent.keyDown(search(), { key: "Enter" });
+  await waitFor(() => expect(select).toHaveBeenCalledWith("nocturne"));
+});
+
+it("restores No project as the first highlighted option when search is cleared", async () => {
+  const select = vi.fn(async () => {});
+  render(<Flow onSelectProject={select} />);
+  await openPicker();
+  fireEvent.change(search(), { target: { value: "Alpha" } });
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("option", { name: /Alpha Web/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true"),
+  );
+  fireEvent.change(search(), { target: { value: "" } });
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("option", { name: "No project" })
+        .getAttribute("aria-selected"),
+    ).toBe("true"),
+  );
+  fireEvent.keyDown(search(), { key: "Enter" });
+  await waitFor(() => expect(select).toHaveBeenCalledWith(PERSONAL_PROJECT_ID));
+});
+
+it("does not offer No project for a nonempty search while projects load", async () => {
+  const select = vi.fn(async () => {});
+  const { rerender } = render(
+    <Flow projects={undefined} onSelectProject={select} />,
+  );
+  await openPicker();
+  fireEvent.change(search(), { target: { value: "Alpha" } });
+  expect(screen.queryByRole("option", { name: "No project" })).toBeNull();
+  fireEvent.keyDown(search(), { key: "Enter" });
+  expect(select).not.toHaveBeenCalled();
+  rerender(<Flow onSelectProject={select} />);
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("option", { name: /Alpha Web/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true"),
+  );
+  fireEvent.keyDown(search(), { key: "Enter" });
+  await waitFor(() => expect(select).toHaveBeenCalledWith("alpha"));
+});
