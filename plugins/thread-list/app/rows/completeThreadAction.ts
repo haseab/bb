@@ -129,6 +129,26 @@ export const completeThreadAction: PluginThreadActionRegistration<
   group: experimental_THREAD_ACTION_GROUPS.lifecycle,
   order: 0,
   useData: useThreadCompletion,
+  experimental_bulkItem: ({ threads, data }) => {
+    const active = threads.filter((thread) => thread.archivedAt === null);
+    if (active.length === 0) return null;
+    const completed = active.every(
+      (thread) =>
+        data.sectionId !== null && thread.sectionId === data.sectionId,
+    );
+    return {
+      label: `${completed ? "Reopen" : "Complete"} ${active.length} threads`,
+      icon: completed ? "RotateCcw" : "Check",
+      disabled: !data.ready,
+      run: async () => {
+        const results = await Promise.allSettled(
+          active.map((thread) => data.setCompleted(thread.id, !completed)),
+        );
+        const failed = results.find((result) => result.status === "rejected");
+        if (failed?.status === "rejected") throw failed.reason;
+      },
+    };
+  },
   item: ({ thread, data }) => {
     if (thread.archivedAt !== null) return null;
     const completed =

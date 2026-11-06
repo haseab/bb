@@ -66,9 +66,10 @@ import {
   invalidateThreadQueueQueries,
   markThreadAcceptedMessageQueriesStale,
   invalidateThreadQueuedMessageSendQueries,
-  invalidateThreadListMembershipQueries,
+  invalidateThreadListQueries,
   refetchThreadListsAfterComposerThreadCreate,
 } from "./mutation-cache-effects";
+import { readThreadBack } from "./thread-read-back";
 
 interface ThreadIdCacheArgs {
   queryClient: QueryClient;
@@ -400,6 +401,7 @@ function buildOptimisticQueuedMessage({
     waitingOn: scheduledSendAt === null ? null : { kind: "time" },
     failureReason: null,
     payload: { kind: "inline" },
+    systemNotice: null,
     editable: true,
     createdAt,
     updatedAt: createdAt,
@@ -982,7 +984,7 @@ export function applySendThreadMessageSuccess({
         createdAt: optimisticCreatedAt,
         queryClient,
         threadId: request.id,
-      }).succeed();
+      }).confirm([], readThreadBack(queryClient));
       insertOptimisticTimelineRow(
         queryClient,
         request.id,
@@ -1001,7 +1003,8 @@ export function applySendThreadMessageSuccess({
     });
   }
 
-  if (transaction?.kind === "accepted-turn") transaction.prediction.succeed();
+  if (transaction?.kind === "accepted-turn")
+    transaction.prediction.confirm([], readThreadBack(queryClient));
   prependThreadPromptHistory(
     queryClient,
     request.id,
@@ -1039,7 +1042,13 @@ export async function beginUpdateQueuedMessageTransaction({
         queuedMessage.id === request.queuedMessageId
           ? {
               ...queuedMessage,
-              content: request.input,
+              content: request.input ?? queuedMessage.content,
+              model: request.model ?? queuedMessage.model,
+              permissionMode:
+                request.permissionMode ?? queuedMessage.permissionMode,
+              reasoningLevel:
+                request.reasoningLevel ?? queuedMessage.reasoningLevel,
+              serviceTier: request.serviceTier ?? queuedMessage.serviceTier,
               updatedAt: optimisticUpdatedAt ?? queuedMessage.updatedAt,
             }
           : queuedMessage,
@@ -1069,6 +1078,10 @@ export function rollbackUpdateQueuedMessageTransaction({
             ? {
                 ...queuedMessage,
                 content: previousQueuedMessage.content,
+                model: previousQueuedMessage.model,
+                permissionMode: previousQueuedMessage.permissionMode,
+                reasoningLevel: previousQueuedMessage.reasoningLevel,
+                serviceTier: previousQueuedMessage.serviceTier,
                 updatedAt: previousQueuedMessage.updatedAt,
               }
             : queuedMessage,
@@ -1255,7 +1268,7 @@ export function applyQueuedMessageSendResult({
       );
     }
     transaction?.prediction?.fail();
-  } else transaction?.prediction?.succeed();
+  } else transaction?.prediction?.confirm([], readThreadBack(queryClient));
   invalidateThreadQueuedMessageSendQueries({
     queryClient,
     threadId: request.id,
@@ -1375,9 +1388,11 @@ export function rollbackStopThreadTransaction({
 
 export function settleStopThreadTransaction({
   queryClient,
-  threadId,
   transaction,
-}: ThreadIdCacheArgs & { transaction?: StopThreadTransaction }): void {
-  transaction?.prediction.succeed();
-  invalidateThreadListMembershipQueries({ queryClient, threadId });
+}: {
+  queryClient: QueryClient;
+  transaction?: StopThreadTransaction | undefined;
+}): void {
+  transaction?.prediction.confirm([], readThreadBack(queryClient));
+  invalidateThreadListQueries({ queryClient });
 }

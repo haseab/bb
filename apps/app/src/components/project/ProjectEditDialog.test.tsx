@@ -74,6 +74,7 @@ const thread = {
   id: "thr_editor",
   projectId: "proj_editor",
   parentThreadId: null,
+  parentNotifications: "auto" as const,
   archivedAt: null,
   pinnedAt: null,
   sectionId: null,

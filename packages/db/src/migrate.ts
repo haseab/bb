@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { migrate as drizzleMigrate } from "drizzle-orm/better-sqlite3/migrator";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { dirname, join, resolve } from "node:path";
@@ -1409,6 +1410,61 @@ function validateAppliedMigrationHistory(
   );
 }
 
+function reconcileLegacyForkMigrations(
+  db: DbConnection,
+  migrationsFolder: string,
+): void {
+  const legacy = [
+    { tag: "0147_tiny_zaladane", when: 1792881357146 },
+    { tag: "0148_great_reaper", when: 1792906525818 },
+    { tag: "0149_curvy_shatterstar", when: 1792919398157 },
+  ];
+  const applied = readAppliedMigrationCreatedAts(db);
+  if (!legacy.some((entry) => applied.has(entry.when))) return;
+  const expected = readExpectedAppliedMigrations(migrationsFolder);
+  const combined = requireExpectedAppliedMigration(
+    expected,
+    "0153_colorful_northstar",
+  );
+  if (applied.has(combined.createdAt)) return;
+  db.$client.transaction(() => {
+    for (const entry of legacy) {
+      const sql = readFileSync(
+        join(migrationsFolder, "legacy-fork", `${entry.tag}.sql`),
+        "utf8",
+      );
+      const migration = {
+        tag: entry.tag,
+        createdAt: entry.when,
+        hash: createHash("sha256").update(sql).digest("hex"),
+        sql: sql.split("--> statement-breakpoint"),
+      };
+      if (applied.has(entry.when)) {
+        const row = db.$client
+          .prepare<[number], { hash: string }>(
+            "SELECT hash FROM __drizzle_migrations WHERE created_at = ?",
+          )
+          .get(entry.when);
+        if (row?.hash !== migration.hash)
+          throw new Error(`Legacy fork migration hash mismatch: ${entry.tag}`);
+      } else {
+        applyMigrationStatements(db, migration);
+        applied.add(entry.when);
+      }
+    }
+    for (const migration of expected) {
+      if (
+        migration.createdAt >= combined.createdAt ||
+        applied.has(migration.createdAt)
+      )
+        continue;
+      applyMigrationStatements(db, migration);
+      applied.add(migration.createdAt);
+    }
+    markMigrationApplied(db, combined);
+  })();
+}
+
 export function migrate(db: DbConnection, options: MigrateOptions = {}): void {
   const migrationsFolder = resolveMigrationsFolder();
   const sqlite = db.$client;
@@ -1454,6 +1510,7 @@ export function migrate(db: DbConnection, options: MigrateOptions = {}): void {
     const stagedThreadStorageDeletedAt =
       stageExistingThreadStorageDeletedAtColumn(db, migrationsFolder);
     try {
+      reconcileLegacyForkMigrations(db, migrationsFolder);
       drizzleMigrate(db, { migrationsFolder });
     } finally {
       if (stagedConnectMachineId) restoreStagedConnectMachineIdColumn(db);

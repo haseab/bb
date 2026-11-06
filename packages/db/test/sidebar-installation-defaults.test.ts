@@ -1,8 +1,8 @@
+import { migrate } from "./helpers/migrate-with-fork-extensions.js";
 import { describe, expect, it } from "vitest";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import {
   createConnection,
-  migrate,
   createProject,
   createThread,
   upsertHost,
@@ -14,6 +14,8 @@ import {
   rewindThreadPruningWork,
   dropMarketplaceSourceGitSubdirectoryColumn,
   dropThreadParentNotificationsColumn,
+  dropQueuedMessageDeliveryColumns,
+  dropThreadStatusChangedAtColumn,
   dropQueuedMessageEditHeldUntilColumn,
 } from "./helpers/rewind.js";
 
@@ -92,6 +94,8 @@ describe.each(["project", "thread", "preference"] as const)(
           dropQueuedMessageEditHeldUntilColumn(db);
           dropMarketplaceSourceGitSubdirectoryColumn(db);
           dropThreadParentNotificationsColumn(db);
+          dropQueuedMessageDeliveryColumns(db);
+          dropThreadStatusChangedAtColumn(db);
           db.$client
             .prepare("DELETE FROM __drizzle_migrations WHERE created_at >= ?")
             .run(SIDEBAR_INSTALLATION_DEFAULTS_MIGRATION_TIMESTAMP);

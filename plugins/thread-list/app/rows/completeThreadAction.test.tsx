@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { testPanelController } from "../model/test-panel.js";
 import {
   act,
   cleanup,
@@ -35,14 +36,31 @@ const { useSdk, useBbNavigate } = await import("@get-bb/plugin-sdk/app");
 const { completeThreadAction, useThreadCompletion } =
   await import("./completeThreadAction.js");
 
-function Probe({ thread }: { thread: PluginThreadActionTarget }) {
+function Probe({
+  thread,
+  bulk,
+}: {
+  thread: PluginThreadActionTarget;
+  bulk?: PluginThreadActionTarget[];
+}) {
   const data = useThreadCompletion();
-  const action = completeThreadAction.item({
-    thread,
-    data,
-    sdk: useSdk(),
-    navigate: useBbNavigate(),
-  });
+  const sdk = useSdk();
+  const navigate = useBbNavigate();
+  const action = bulk
+    ? completeThreadAction.experimental_bulkItem?.({
+        threads: bulk,
+        data,
+        sdk,
+        navigate,
+        experimental_panel: testPanelController,
+      })
+    : completeThreadAction.item({
+        thread,
+        data,
+        sdk,
+        navigate,
+        experimental_panel: testPanelController,
+      });
   return action ? (
     <button
       disabled={action.disabled}
@@ -61,6 +79,52 @@ afterEach(() => {
 });
 
 describe("Complete thread menu action", () => {
+  it("reopens a completed selection through upstream's bulk action menu", async () => {
+    setPreferencesMirrorStorageForTest(null);
+    const bulk = ["a", "b"].map((id) =>
+      toThreadActionTarget(
+        makeSidebarThread({ id, sectionId: "sec_completed" }),
+      ),
+    );
+    const setCompleted = vi.fn((input: unknown) => ({
+      threadId: (input as { threadId: string }).threadId,
+      sectionId: null,
+    }));
+    renderSlot(
+      { component: Probe },
+      { thread: bulk[0]!, bulk },
+      {
+        sdk: { threads: { get: vi.fn(sdkResult(makeThreadResponse())) } },
+        rpc: {
+          listPreferences: () => ({
+            preferences: {
+              ...defaultPreferences(),
+              completedSectionId: "sec_completed",
+            },
+          }),
+          setCompleted,
+        },
+      },
+    );
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Reopen 2 threads" })
+          .hasAttribute("disabled"),
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reopen 2 threads" }));
+    await waitFor(() => expect(setCompleted).toHaveBeenCalledTimes(2));
+    expect(setCompleted).toHaveBeenCalledWith({
+      threadId: "a",
+      completed: false,
+    });
+    expect(setCompleted).toHaveBeenCalledWith({
+      threadId: "b",
+      completed: false,
+    });
+  });
+
   it.each([
     [null, "Complete", true],
     ["sec_completed", "Reopen", false],
@@ -324,6 +388,7 @@ describe("Complete thread menu action", () => {
         threadId: "current",
         projectId: current.projectId,
         openPanel: () => false,
+        experimental_panel: testPanelController,
       };
       const original = screen.getByRole("link", { name: "Current" });
       original.focus();

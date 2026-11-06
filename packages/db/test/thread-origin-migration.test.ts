@@ -51,7 +51,10 @@ it("backfills native imports while preserving BB sessions that also sync", () =>
     }
     db.$client.exec("ALTER TABLE threads DROP COLUMN creation_source");
     const sql = readFileSync(
-      new URL("../drizzle/0149_curvy_shatterstar.sql", import.meta.url),
+      new URL(
+        "../drizzle/legacy-fork/0149_curvy_shatterstar.sql",
+        import.meta.url,
+      ),
       "utf8",
     );
     for (const statement of sql.split("--> statement-breakpoint"))

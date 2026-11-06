@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
   AvailableModel,
   ProviderCapabilities,
@@ -26,7 +27,6 @@ import {
   ASSEMBLER_GRAMMAR_VERSIONS,
   createDeltaAssembler,
 } from "@bb/provider-bridge-protocol/assembler";
-import { z } from "zod";
 import type {
   AdapterCommand,
   ProviderExecutionContext,
@@ -102,10 +102,6 @@ interface BridgeProtocolAdapterOptions {
   process: { command: string; args: string[]; env?: Record<string, string> };
   staticProviderOptions?: Record<string, unknown>;
 }
-
-const providerNativeIdsParamsSchema = z
-  .object({ providerNativeIds: z.boolean().optional() })
-  .passthrough();
 
 function toBridgeWireOptions(
   options: ProviderExecutionContext,
@@ -234,6 +230,9 @@ export function createBridgeProtocolAdapter(
             params: {
               ...cwdAndStaticProviderOptions(command.cwd),
               envVars: command.envVars,
+              ...(command.selectedModel === undefined
+                ? {}
+                : { selectedModel: command.selectedModel }),
             },
           };
         case "commands/list":
@@ -622,15 +621,7 @@ export function createBridgeProtocolAdapter(
         request.method,
         request.params,
       );
-      if (decoded === null) {
-        return decoded;
-      }
-      const marker = providerNativeIdsParamsSchema.safeParse(request.params);
-      if (
-        marker.success !== true ||
-        marker.data.providerNativeIds !== true ||
-        decoded.threadId === undefined
-      ) {
+      if (decoded === null || decoded.threadId === undefined) {
         return decoded;
       }
       return {
@@ -659,10 +650,10 @@ export function createBridgeProtocolAdapter(
       if (!parsed.success) {
         return null;
       }
-      const { providerNativeIds, threadId, ...decoded } = parsed.data;
+      const { threadId, ...decoded } = parsed.data;
       let turnId = decoded.turnId;
       let payload = decoded.payload;
-      if (providerNativeIds === true && threadId !== undefined) {
+      if (threadId !== undefined) {
         turnId =
           turnId === null
             ? null

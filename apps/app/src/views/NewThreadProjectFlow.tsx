@@ -136,10 +136,12 @@ export function NewThreadProjectFlow({
               defaultValue={PERSONAL_PROJECT_ID}
               loop
               onKeyDownCapture={(event) => {
-                if (event.key !== "Escape" || query.length === 0) return;
+                if (event.key !== "Escape") return;
                 event.preventDefault();
                 event.stopPropagation();
                 setQuery("");
+                setError(null);
+                setChoosing(false);
               }}
             >
               <CommandInput
@@ -172,23 +174,33 @@ export function NewThreadProjectFlow({
                     <CommandEmpty>
                       No projects found. Try another name.
                     </CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value={PERSONAL_PROJECT_ID}
-                        keywords={["No project", "Personal", "Ask anything"]}
-                        disabled={pendingProjectId !== null}
-                        onSelect={() => void selectProject(PERSONAL_PROJECT_ID)}
-                        className="cursor-pointer gap-3 rounded-lg px-3 py-3"
-                      >
-                        <Icon
-                          name="FolderMinus"
-                          className="text-muted-foreground"
-                          aria-hidden
-                        />
-                        <span>No project</span>
-                      </CommandItem>
-                    </CommandGroup>
-                    <CommandSeparator className="my-2" />
+                    {query.trim().length === 0 ? (
+                      <>
+                        <CommandGroup>
+                          <CommandItem
+                            value={PERSONAL_PROJECT_ID}
+                            keywords={[
+                              "No project",
+                              "Personal",
+                              "Ask anything",
+                            ]}
+                            disabled={pendingProjectId !== null}
+                            onSelect={() =>
+                              void selectProject(PERSONAL_PROJECT_ID)
+                            }
+                            className="cursor-pointer gap-3 rounded-lg px-3 py-3"
+                          >
+                            <Icon
+                              name="FolderMinus"
+                              className="text-muted-foreground"
+                              aria-hidden
+                            />
+                            <span>No project</span>
+                          </CommandItem>
+                        </CommandGroup>
+                        <CommandSeparator className="my-2" />
+                      </>
+                    ) : null}
                     {loading ? (
                       <p
                         role="status"

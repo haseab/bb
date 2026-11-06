@@ -39,6 +39,7 @@ export type ProjectPathDialogTarget =
       projectName: string;
       currentPath: string;
       hostId?: string;
+      hostName?: string;
     }
   | {
       kind: "add-source";
@@ -165,16 +166,15 @@ export function ProjectPathDialogContent({
 }: ProjectPathDialogContentProps) {
   const inputId = useId();
   const isPointerCoarse = usePointerCoarse();
+  const targetHostId = target.kind === "update" ? target.hostId : hostId;
+  const targetHostName = target.kind === "update" ? target.hostName : hostName;
   const machineOptions =
     target.kind === "update" ? undefined : selectHosts(hosts, "all");
   const firstConnectedHostId = machineOptions?.find(
     (host) => host.status === "connected",
   )?.id;
   const [selectedHostIdState, setSelectedHostId] = useState(
-    (target.kind === "update" ? target.hostId : null) ??
-      hostId ??
-      firstConnectedHostId ??
-      null,
+    targetHostId ?? firstConnectedHostId ?? null,
   );
   const selectedHostId =
     machineOptions === undefined ||
@@ -186,7 +186,7 @@ export function ProjectPathDialogContent({
   const selectedHost = (machineOptions ?? hosts)?.find(
     (host) => host.id === selectedHostId,
   );
-  const selectedHostName = selectedHost?.name ?? hostName;
+  const selectedHostName = selectedHost?.name ?? targetHostName;
   const selectedHostConnected =
     selectedHost === undefined || selectedHost.status === "connected";
   const showMachinePicker = (machineOptions?.length ?? 0) > 1;
@@ -201,7 +201,7 @@ export function ProjectPathDialogContent({
   const [validationMessage, setValidationMessage] = useState<string | null>(
     null,
   );
-  const copy = getPlatformCopy(platform, selectedHostName);
+  const copy = getPlatformCopy(platform, selectedHostName ?? null);
   const placeholder =
     target.kind === "update"
       ? target.currentPath || copy.placeholder

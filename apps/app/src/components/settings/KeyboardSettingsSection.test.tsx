@@ -471,7 +471,7 @@ describe("KeyboardSettingsSection", () => {
     fireEvent.change(
       screen.getByRole("textbox", { name: "Search keyboard shortcuts" }),
       {
-        target: { value: "sidebar" },
+        target: { value: "  SiDeBaR  " },
       },
     );
 

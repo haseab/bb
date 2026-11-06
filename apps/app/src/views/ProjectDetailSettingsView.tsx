@@ -145,8 +145,8 @@ function ProjectFolderRow({
               {
                 label: "Change folder",
                 icon: "Folder",
-                disabled: !canEditPath || pending,
-                disabledReason: canEditPath
+                disabled: !connected || pending,
+                disabledReason: connected
                   ? undefined
                   : "Bring this machine online to change its folder.",
                 onSelect: onChangePath,

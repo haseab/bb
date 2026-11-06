@@ -1,3 +1,4 @@
+import { migrate } from "./helpers/migrate-with-fork-extensions.js";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
@@ -6,7 +7,6 @@ import {
   createConnection,
   createQueuedThreadMessage,
   createThread,
-  migrate,
   noopNotifier,
 } from "../src/index.js";
 import {
@@ -15,6 +15,8 @@ import {
   rewindThreadPruningWork,
   dropMarketplaceSourceGitSubdirectoryColumn,
   dropThreadParentNotificationsColumn,
+  dropQueuedMessageDeliveryColumns,
+  dropThreadStatusChangedAtColumn,
   dropQueuedMessageEditHeldUntilColumn,
 } from "./helpers/rewind.js";
 
@@ -118,6 +120,8 @@ it.each([false, true])(
       dropQueuedMessageEditHeldUntilColumn(db);
       dropMarketplaceSourceGitSubdirectoryColumn(db);
       dropThreadParentNotificationsColumn(db);
+      dropQueuedMessageDeliveryColumns(db);
+      dropThreadStatusChangedAtColumn(db);
       migrate(db);
       migrate(db);
 

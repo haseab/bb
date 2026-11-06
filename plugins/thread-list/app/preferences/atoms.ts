@@ -59,3 +59,8 @@ export const sidebarCompletedSectionIdAtom =
 export const sidebarThreadsSectionLabelAtom = createSyncedPreferenceAtom(
   "threadsSectionLabel",
 );
+export const sidebarShowRowMetadataAtom =
+  createSyncedPreferenceAtom("showRowMetadata");
+export const THREAD_ROW_METADATA_EXPERIMENT = "threadRowMetadata";
+export const sidebarShowEmptyProjectsAtom =
+  createSyncedPreferenceAtom("showEmptyProjects");
