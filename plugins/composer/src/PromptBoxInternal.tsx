@@ -1,3 +1,4 @@
+import { handlePromptListEnter } from "./editor/prompt-editor-list-enter";
 import {
   experimental_ComposerRoot as ComposerRoot,
   experimental_FailedVoiceRecordings as FailedVoiceRecordings,
@@ -3256,6 +3257,10 @@ export function PromptBoxInternal({
       if (isModifierSubmitKeyEvent(event) && onModifierSubmit) {
         event.preventDefault();
         submitModifierPrompt();
+        return true;
+      }
+
+      if (currentEditor && handlePromptListEnter(currentEditor, event)) {
         return true;
       }
 
