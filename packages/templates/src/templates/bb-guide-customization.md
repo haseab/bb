@@ -97,7 +97,9 @@ General. Machine-related keys (`machineServerUrl`, `defaultMachineAccess`,
 - `steerActiveThreadOnEnter` (default true for a new install; an earlier
   install with saved settings or work keeps false): when on, Enter steers a
   running thread and Command+Enter queues a follow-up; when off, those are
-  reversed. Shift+Enter inserts a newline.
+  reversed. Shift+Enter inserts a newline. In a bullet or numbered list, plain
+  Enter continues the list. Enter on an empty item leaves the list; the next
+  Enter on the blank paragraph submits.
 - Git changes above the composer, the Commit button (off by default) and the
   pull request above the composer are plugin settings:
   `bb plugin config bb--git set showGitChanges false`,
