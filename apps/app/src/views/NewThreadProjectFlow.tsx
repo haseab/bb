@@ -188,14 +188,32 @@ export function NewThreadProjectFlow({
                             onSelect={() =>
                               void selectProject(PERSONAL_PROJECT_ID)
                             }
-                            className="cursor-pointer gap-3 rounded-lg px-3 py-3"
+                            className="group cursor-pointer gap-3 rounded-lg px-3 py-3"
                           >
+                            <span
+                              className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                              style={projectBadgeStyle(
+                                projectBadgeLabel("No project"),
+                              )}
+                            >
+                              <Icon name="Folder" aria-hidden />
+                            </span>
+                            <span className="min-w-0 flex-1 truncate font-medium">
+                              No project
+                            </span>
                             <Icon
-                              name="FolderMinus"
-                              className="text-muted-foreground"
+                              name={
+                                pendingProjectId === PERSONAL_PROJECT_ID
+                                  ? "Loader2"
+                                  : "ArrowRight"
+                              }
+                              className={cn(
+                                "text-muted-foreground opacity-0 group-data-[selected=true]:opacity-100",
+                                pendingProjectId === PERSONAL_PROJECT_ID &&
+                                  "animate-spin opacity-100",
+                              )}
                               aria-hidden
                             />
-                            <span>No project</span>
                           </CommandItem>
                         </CommandGroup>
                         <CommandSeparator className="my-2" />
