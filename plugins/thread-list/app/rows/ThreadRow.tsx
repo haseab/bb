@@ -1,14 +1,3 @@
-import { QuickDecisionDot } from "../decisions/QuickDecisionDot.js";
-import { useQuickDecision } from "../decisions/state.js";
-import type { QuickDecision } from "../../shared/decisions.js";
-import {
-  BB_THREAD_ORIGIN_COLOR,
-  threadOrigin,
-} from "@/components/ui/thread-origin";
-import {
-  projectBadgeLabel,
-  projectBadgeStyle,
-} from "@/components/ui/project-identity";
 import {
   memo,
   createContext,
@@ -68,7 +57,6 @@ import { useThreadsHaveDraft } from "../list/sidebarDraftPresence.js";
 import { NO_HIDDEN_THREADS } from "../list/groupRollups.js";
 import { useSidebarProjectName } from "../model/use-sidebar-data.js";
 import {
-  sidebarOrganizationModeAtom,
   sidebarShowProviderIconsAtom,
   sidebarShowRowMetadataAtom,
   THREAD_ROW_METADATA_EXPERIMENT,
@@ -271,25 +259,13 @@ function renderThreadRowContainer({
 }
 
 function ThreadTrailingIndicator({
-  decision,
   status,
   hideIdleDraftLabel,
 }: {
-  decision: QuickDecision | null;
   status: PluginThreadStatus;
   hideIdleDraftLabel: boolean;
 }) {
-  const showDecision =
-    decision !== null &&
-    ["unread-success", "waiting-for-input", "none", "draft"].includes(
-      status.indicator,
-    ) &&
-    status.rowStatus === null;
-  if (
-    !showDecision &&
-    status.indicator === "none" &&
-    status.rowStatus === null
-  ) {
+  if (status.indicator === "none" && status.rowStatus === null) {
     return null;
   }
 
@@ -301,15 +277,11 @@ function ThreadTrailingIndicator({
         SIDEBAR_STATUS_GLYPH_BOX_CLASS,
       )}
     >
-      {showDecision ? (
-        <QuickDecisionDot decision={decision} />
-      ) : (
-        <ThreadStatusGlyph
-          indicator={status.indicator}
-          rowStatus={status.rowStatus}
-          hideIdleDraftLabel={hideIdleDraftLabel}
-        />
-      )}
+      <ThreadStatusGlyph
+        indicator={status.indicator}
+        rowStatus={status.rowStatus}
+        hideIdleDraftLabel={hideIdleDraftLabel}
+      />
     </span>
   );
 }
@@ -375,12 +347,6 @@ function ThreadRowComponent({
   const multiSelection = useMultiSelectionContaining(thread.id);
   const selectionMenu = useThreadSelectionMenu(multiSelection);
   const showProviderIcons = useAtomValue(sidebarShowProviderIconsAtom);
-  const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
-  const projectName = useSidebarProjectName(thread.projectId);
-  const projectBadge =
-    organizationMode === "chronological" && projectName
-      ? projectBadgeLabel(projectName)
-      : null;
   const rowMetadataEnabled = experimental_useExperiment(
     THREAD_ROW_METADATA_EXPERIMENT,
   );
@@ -390,16 +356,6 @@ function ThreadRowComponent({
   const provider = showProviderIcons
     ? providers.find((candidate) => candidate.id === thread.providerId)
     : undefined;
-  const origin = threadOrigin(
-    thread.experimental_creationSource,
-    thread.providerId,
-  );
-  const providerLabel = provider
-    ? `${provider.displayName} · ${origin.description}`
-    : origin.description;
-  const tintBbCodex =
-    thread.providerId === "codex" &&
-    thread.experimental_creationSource !== "native";
   const shortcut = useSidebarThreadShortcut(thread.id);
   const pluginThreadRowStatus = useSidebarThreadRowStatus(thread.id);
   const { hasUnsubmittedDraft: hasComposerDraft } = useSidebarThreadDraft(
@@ -494,10 +450,6 @@ function ThreadRowComponent({
     hasHiddenChildren && parentOptions
       ? parentOptions.hiddenThreads
       : NO_HIDDEN_THREADS;
-  const quickDecision = useQuickDecision(
-    thread,
-    hiddenThreads.map((child) => child.id),
-  );
   const hiddenChildrenHaveDraft = useThreadsHaveDraft(hiddenThreads);
   const trailingStatus = experimental_resolveThreadStatus({
     thread,
@@ -523,7 +475,6 @@ function ThreadRowComponent({
   const rowClassName = cn(
     SIDEBAR_HOVER_ACTIONS_ROW_CLASS,
     "group/thread-row cursor-pointer",
-    "has-[[data-sidebar-thread-cursor=true]]:ring-1 has-[[data-sidebar-thread-cursor=true]]:ring-inset has-[[data-sidebar-thread-cursor=true]]:ring-sidebar-ring",
     SIDEBAR_ROW_BASE_CLASS,
     LIST_HOVER_TRANSITION,
     parentOptions?.stickyLevel === undefined && "relative",
@@ -558,17 +509,6 @@ function ThreadRowComponent({
   );
 
   const rowLinkRef = useRef<HTMLAnchorElement>(null);
-  const pendingKeyboardOpen = useRef(false);
-  useEffect(() => {
-    if (!isActive || !pendingKeyboardOpen.current) return;
-    pendingKeyboardOpen.current = false;
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
-        rowLinkRef.current?.focus({ preventScroll: true });
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [isActive]);
   useEffect(() => {
     if (isCustomizingActions) {
       focusFirstRowActionSlot(
@@ -666,25 +606,6 @@ function ThreadRowComponent({
             }
             onProjectSelect?.();
           }}
-          onKeyDown={(event) => {
-            if (
-              event.key !== "Enter" ||
-              event.metaKey ||
-              event.ctrlKey ||
-              event.altKey ||
-              event.shiftKey ||
-              event.repeat ||
-              isEditing
-            )
-              return;
-            if (isActive) {
-              event.preventDefault();
-              event.stopPropagation();
-              startEditing();
-            } else {
-              pendingKeyboardOpen.current = true;
-            }
-          }}
           onDoubleClick={isEditing ? undefined : startTitleEditing}
           aria-label={linkLabel}
           aria-keyshortcuts={shortcut?.ariaKeyshortcuts}
@@ -697,27 +618,6 @@ function ThreadRowComponent({
               : "contents"
           }
         >
-          {projectBadge ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  data-sidebar-thread-project={thread.projectId}
-                  role="img"
-                  aria-label={`In project ${projectName}`}
-                  className="pointer-events-auto relative z-[31] mr-1.5 flex h-5 min-w-7 shrink-0 items-center justify-center rounded px-1 text-2xs font-medium"
-                  style={projectBadgeStyle(projectBadge)}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    rowLinkRef.current?.click();
-                  }}
-                >
-                  {projectBadge}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">{projectName}</TooltipContent>
-            </Tooltip>
-          ) : null}
           <span
             className={cn(
               "pointer-events-none relative flex min-w-0 items-center self-stretch",
@@ -734,15 +634,6 @@ function ThreadRowComponent({
                     data-sidebar-thread-provider={provider.id}
                     role="img"
                     aria-label={provider.displayName}
-                    aria-description={origin.description}
-                    style={
-                      tintBbCodex
-                        ? { color: BB_THREAD_ORIGIN_COLOR }
-                        : undefined
-                    }
-                    data-thread-origin={
-                      thread.experimental_creationSource ?? "bb"
-                    }
                     className="pointer-events-auto relative z-[31] flex size-4 shrink-0 items-center justify-center mr-2 text-muted-foreground"
                     onClick={(event) => {
                       event.preventDefault();
@@ -752,22 +643,14 @@ function ThreadRowComponent({
                   >
                     <ProviderIcon
                       providerKind="agent"
-                      provider={
-                        tintBbCodex
-                          ? {
-                              ...provider,
-                              strings: {
-                                ...provider.strings,
-                                iconTint: undefined,
-                              },
-                            }
-                          : provider
-                      }
+                      provider={provider}
                       className="size-3.5"
                     />
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="top">{providerLabel}</TooltipContent>
+                <TooltipContent side="top">
+                  {provider.displayName}
+                </TooltipContent>
               </Tooltip>
             ) : null}
             {isEditing ? (
@@ -904,7 +787,7 @@ function ThreadRowComponent({
                   "absolute inset-0 flex items-center justify-center",
                 )}
               >
-                {miniMap && quickDecision === null ? (
+                {miniMap ? (
                   <span
                     data-sidebar-thread-trailing-indicator=""
                     className={cn(
@@ -920,7 +803,6 @@ function ThreadRowComponent({
                   </span>
                 ) : (
                   <ThreadTrailingIndicator
-                    decision={quickDecision}
                     status={trailingStatus}
                     hideIdleDraftLabel={
                       !hasHiddenChildren && trailingStatus.indicator === "draft"

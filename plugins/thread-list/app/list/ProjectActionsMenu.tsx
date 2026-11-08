@@ -1,4 +1,3 @@
-import { experimental_useProjectEditor } from "@get-bb/plugin-sdk/app";
 import type { MouseEvent, ReactNode } from "react";
 import {
   ContextMenu,
@@ -44,16 +43,8 @@ export function ProjectActionsMenuItems({
   onRemove,
   extraActions,
 }: ProjectActionsMenuItemsProps) {
-  const editProject = experimental_useProjectEditor();
   return (
     <>
-      <ActionMenuItem
-        surface={surface}
-        icon="Folder"
-        onSelect={() => editProject(project.id)}
-      >
-        Edit project…
-      </ActionMenuItem>
       <ActionMenuItem
         surface={surface}
         icon="Settings"

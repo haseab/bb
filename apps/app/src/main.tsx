@@ -18,16 +18,6 @@ import { installStaleChunkRecovery } from "./lib/stale-chunk-recovery";
 import { moveStylesheetPropertiesToRegistry } from "./lib/stylesheet-property-registry";
 import "./app.css";
 
-if (import.meta.env.DEV) {
-  const { installInMemoryThreadPreview } =
-    await import("./lib/in-memory-thread-preview");
-  const { updateInMemoryPreviewSidebar } =
-    await import("./hooks/cache-owners/in-memory-preview-cache-owner");
-  installInMemoryThreadPreview((data) =>
-    updateInMemoryPreviewSidebar(appQueryClient, data),
-  );
-}
-
 installStaleChunkRecovery();
 installForeignDomMutationGuard();
 

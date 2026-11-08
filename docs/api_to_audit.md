@@ -14,20 +14,6 @@ question.
 [provider-bridge-protocol.md](provider-bridge-protocol.md). An entry without
 a "Docs:" line has no owning doc, so it keeps the essential contract itself.
 
-## Project editor
-
-`experimental_useProjectEditor()` from `@get-bb/plugin-sdk/app` opens the
-host-owned project editor by ID. Core project menus, the core thread action
-and the thread-list plugin's project menus call the same `useProjectEditor`
-implementation and host dialog. Personal is ignored. The test harness records
-IDs in `RenderedSlotInspectionState.experimental_projectEditorCalls`.
-
-Docs: `frontend-registration.md`, `frontend-api-index.md`. Plugin Guide: The thread list.
-
-Before stabilization, verify project deletion while open, folder attach/detach
-and name errors, project and thread menu parity, plugin reload, and compact
-Safari drawer focus/stacking.
-
 ## Host paths (`@get-bb/plugin-sdk`)
 
 `experimental_normalizeHostPath(path)`,

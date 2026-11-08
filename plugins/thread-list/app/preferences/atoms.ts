@@ -47,18 +47,6 @@ export const sidebarThreadLifecyclesAtom =
   createSyncedPreferenceAtom("threadLifecycles");
 export const sidebarShowProviderIconsAtom =
   createSyncedPreferenceAtom("showProviderIcons");
-
-export const sidebarAutoActiveSectionIdAtom = createSyncedPreferenceAtom(
-  "autoActiveSectionId",
-);
-
-export const sidebarManualThreadOrderAtom =
-  createSyncedPreferenceAtom("manualThreadOrder");
-export const sidebarCompletedSectionIdAtom =
-  createSyncedPreferenceAtom("completedSectionId");
-export const sidebarThreadsSectionLabelAtom = createSyncedPreferenceAtom(
-  "threadsSectionLabel",
-);
 export const sidebarShowRowMetadataAtom =
   createSyncedPreferenceAtom("showRowMetadata");
 export const THREAD_ROW_METADATA_EXPERIMENT = "threadRowMetadata";

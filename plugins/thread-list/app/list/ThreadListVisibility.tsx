@@ -1,5 +1,3 @@
-import { TopLevelSidebarSection } from "./TopLevelSidebarSection.js";
-import { useVisibleSidebarThreads } from "./VisibleSidebarThreads.js";
 import { ThreadCreationPlacementScope } from "./ThreadCreationPlacement.js";
 import {
   createContext,
@@ -82,9 +80,6 @@ export function ThreadListVisibility({
   const [customizing, setCustomizing] = useState<"list" | null>(null);
   const [rowActionsThreadId, setRowActionsThreadId] = useState<string | null>(
     null,
-  );
-  const visibleThreads = useVisibleSidebarThreads(
-    groups.flatMap((group) => group.threads),
   );
   const compact = useIsCompactViewport();
   const container = useRef<HTMLDivElement>(null);
@@ -226,36 +221,7 @@ export function ThreadListVisibility({
                 testIdPrefix="sidebar-thread-list"
               />
             ) : (
-              <>
-                {orderedGroups
-                  .filter(
-                    (group) =>
-                      hiddenIds.has(group.id) &&
-                      group.threads.some((thread) =>
-                        visibleThreads.some(
-                          (visible) => visible.id === thread.id,
-                        ),
-                      ),
-                  )
-                  .map((group) => (
-                    <ThreadListVisibilityGroupScope
-                      key={group.id}
-                      id={group.id}
-                    >
-                      <TopLevelSidebarSection
-                        label={group.title}
-                        collapsedThreads={group.threads}
-                        collapseControl={{
-                          isCollapsed: true,
-                          onToggleCollapsed: () => setVisible(group.id, true),
-                        }}
-                      >
-                        {null}
-                      </TopLevelSidebarSection>
-                    </ThreadListVisibilityGroupScope>
-                  ))}
-                {children}
-              </>
+              children
             )}
           </div>
         </ThreadRowActionsCustomizingContext.Provider>

@@ -1,4 +1,3 @@
-import { useProjectEditor } from "./project-editor";
 import { applicationLinkApprovals } from "./application-url";
 import {
   LazyPluginMarkdown,
@@ -223,7 +222,6 @@ export const pluginSdkAppImplementation = {
   experimental_InfoListRow: PluginInfoListRow,
   experimental_useSidebarThreads: useSidebarThreads,
   experimental_useSidebarThreadActions: useSidebarThreadActions,
-  experimental_useProjectEditor: useProjectEditor,
   experimental_useThreadActions: useThreadActionEntries,
   experimental_useArchiveEnvironmentThreads: useArchiveEnvironmentThreads,
   experimental_useThreadActionRegistrations: useThreadActionRegistrationInfos,

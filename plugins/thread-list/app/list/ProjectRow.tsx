@@ -1,8 +1,3 @@
-import { RefreshedQueueDivider } from "../backlog/state.js";
-import {
-  VisibleSidebarThreads,
-  useVisibleSidebarThreads,
-} from "./VisibleSidebarThreads.js";
 import {
   ThreadCreationPlacementScope,
   useThreadCreationPlacement,
@@ -1045,14 +1040,7 @@ const EnvironmentThreadGroupRow = memo(function EnvironmentThreadGroupRow({
               }}
             />
           </div>
-        ) : (
-          <VisibleSidebarThreads
-            threads={stats.hiddenThreads.map(({ id }) => ({ id }))}
-            label="environment threads"
-            depth={rowDepth + 1}
-            onShowAll={() => onToggleEnvironmentCollapsed(environmentId)}
-          />
-        )}
+        ) : null}
       </SidebarStickyGroup>
     </>
   );
@@ -1359,13 +1347,6 @@ const SectionTreeItemRow = memo(function SectionTreeItemRow({
         </SectionDndSortableList>
       ) : null}
     </div>
-  ) : depthOffset > 0 && isCollapsed ? (
-    <VisibleSidebarThreads
-      threads={sectionThreads}
-      label={sectionName}
-      depth={headerDepth + 1}
-      onShowAll={handleToggleCollapsed}
-    />
   ) : null;
 
   if (depthOffset === 0) {
@@ -1587,14 +1568,6 @@ export const ThreadTreeNodeRow = memo(function ThreadTreeNodeRow({
       )}
     >
       {row}
-      {isCollapsed && hasChildren ? (
-        <VisibleSidebarThreads
-          threads={node.stats.hiddenThreads.map(({ id }) => ({ id }))}
-          label="child threads"
-          depth={parentRowDepth + 1}
-          onShowAll={() => onToggleThreadCollapsed(node.thread.id)}
-        />
-      ) : null}
       {showChildren || nestPreviewThread !== null ? (
         <div className="relative space-y-px">
           <ThreadTreeGroupLine parentRowDepth={parentRowDepth} />
@@ -1719,28 +1692,13 @@ function useWindowedThreadItems({
     sidebarCollapsedThreadSectionsAtom,
   );
   const itemKeys = useMemo(() => items.map(getSidebarItemKey), [items]);
-  const visibleThreads = useVisibleSidebarThreads(
-    getProjectThreadItemDescendants(items),
-  );
-  const rowCountVisibleThreads =
-    collapsedThreadIds.size > 0 ||
-    collapsedEnvironmentIds.size > 0 ||
-    collapsedSectionKeyList.length > 0
-      ? visibleThreads
-      : NO_HIDDEN_THREADS;
   const rowCountContext = useMemo<ProjectThreadItemRowCountContext>(
     () => ({
       collapsedThreadIds,
       collapsedEnvironmentIds,
       collapsedSectionKeys: new Set(collapsedSectionKeyList),
-      visibleThreads: rowCountVisibleThreads,
     }),
-    [
-      collapsedThreadIds,
-      collapsedEnvironmentIds,
-      collapsedSectionKeyList,
-      rowCountVisibleThreads,
-    ],
+    [collapsedThreadIds, collapsedEnvironmentIds, collapsedSectionKeyList],
   );
   const estimateRows = useCallback(
     (index: number) => {
@@ -1764,16 +1722,13 @@ function useWindowedThreadItems({
       if (
         (selectedThreadId &&
           projectThreadItemContainsThread(item, selectedThreadId)) ||
-        visibleThreads.some((thread) =>
-          projectThreadItemContainsThread(item, thread.id),
-        ) ||
         (rename && itemContainsRename(item, rename))
       ) {
         keys.add(getSidebarItemKey(item));
       }
     }
     return keys.size > 0 ? keys : undefined;
-  }, [items, selectedThreadId, rename, visibleThreads]);
+  }, [items, selectedThreadId, rename]);
   return { itemKeys, estimateRows, getNavigationEntries, alwaysMountedKeys };
 }
 
@@ -1813,7 +1768,6 @@ function SectionThreadTreeItems({
         const itemKey = getSidebarItemKey(item);
         return (
           <Fragment key={itemKey}>
-            <RefreshedQueueDivider items={items} index={index} />
             <SectionDndItemRow
               projectId={projectId ?? getItemProjectId(item)}
               item={item}

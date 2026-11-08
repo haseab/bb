@@ -1,4 +1,3 @@
-import { codexAiRpcContract } from "./ai/rpc-contract.js";
 import { Buffer } from "node:buffer";
 import type {
   BbPluginApi,
@@ -62,14 +61,6 @@ export function registerCodexAiService(bb: BbPluginApi): void {
     if (last === null) throw new Error("Codex did not answer");
     return textOrThrow(last);
   }
-
-  bb.rpc.register(codexAiRpcContract, {
-    async "ai.complete"({ prompt }) {
-      return {
-        text: await complete(prompt, { signal: AbortSignal.timeout(12_000) }),
-      };
-    },
-  });
 
   bb.experimental_aiServices.register({
     id: "codex",

@@ -351,16 +351,3 @@ Read references/frontend-thread-list.md for replacement list registration, rows,
 
 See [the unified tab contract and migration examples](frontend-core-slots.md#tab-api-migration)
 for replacing legacy registrations while preserving published bundles and saved tabs.
-
-### Project folder editor
-
-`experimental_useProjectEditor()` returns a stable `(projectId: string) => void`
-callback that opens the host's Edit project dialog. It shows source folders,
-their full paths and owning machines, with Add folder and Detach controls, and
-lets the user rename the project. Personal is ignored. The core project menu,
-core thread action and built-in thread-list project's menus use this same path.
-Folder changes save immediately through the existing project source SDK APIs;
-Save name saves the name separately.
-
-The frontend test harness records opened project IDs in
-`RenderedSlotInspectionState.experimental_projectEditorCalls`.

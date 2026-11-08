@@ -41,11 +41,6 @@ import {
 import { SplitPaneMiniMap } from "@/components/ui/split-pane-mini-map";
 import { COARSE_POINTER_ROW_ACTION_SIZE_CLASS } from "@/components/ui/coarse-pointer-sizing";
 
-import {
-  VisibleSidebarThreads,
-  useVisibleSidebarThreads,
-} from "./VisibleSidebarThreads.js";
-
 function stopActionsClick(event: MouseEvent<HTMLSpanElement>) {
   event.stopPropagation();
 }
@@ -98,11 +93,6 @@ export function TopLevelSidebarSection({
   consumeClickSuppression,
   isDropTargetActive = false,
 }: TopLevelSidebarSectionProps) {
-  const visibleThreads = useVisibleSidebarThreads(
-    collapsedThreads ?? NO_HIDDEN_THREADS,
-  );
-  const hasVisiblePreview =
-    collapseControl?.isCollapsed === true && visibleThreads.length > 0;
   const threadDropState = useSectionDropTargetState(dropParentKey);
   const isCollapsed = collapseControl?.isCollapsed === true;
   const rollupThreads = collapsedThreads ?? NO_HIDDEN_THREADS;
@@ -229,7 +219,7 @@ export function TopLevelSidebarSection({
               type="button"
               disabled={Boolean(labelEditor)}
               data-sidebar-rename-anchor=""
-              aria-expanded={!collapseControl.isCollapsed || hasVisiblePreview}
+              aria-expanded={!collapseControl.isCollapsed}
               data-sidebar-hover-actions-mobile={
                 SIDEBAR_HOVER_ACTIONS_MOBILE_ALWAYS_VALUE
               }
@@ -253,8 +243,7 @@ export function TopLevelSidebarSection({
                 name="ChevronRight"
                 className={cn(
                   "size-3 transition-transform duration-150",
-                  (!collapseControl.isCollapsed || hasVisiblePreview) &&
-                    "rotate-90",
+                  !collapseControl.isCollapsed && "rotate-90",
                 )}
                 aria-hidden="true"
               />
@@ -296,13 +285,7 @@ export function TopLevelSidebarSection({
           </span>
         ) : null}
       </SidebarStickyTier>
-      {collapseControl?.isCollapsed ? (
-        <VisibleSidebarThreads
-          threads={collapsedThreads ?? NO_HIDDEN_THREADS}
-          label={label}
-          onShowAll={collapseControl.onToggleCollapsed}
-        />
-      ) : children == null ? null : (
+      {collapseControl?.isCollapsed || children == null ? null : (
         <div className="mt-1">{children}</div>
       )}
     </SidebarStickyGroup>
