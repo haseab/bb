@@ -1,7 +1,4 @@
 import { useHosts } from "@/hooks/queries/host-queries";
-import { useAtom } from "jotai";
-import { projectEditorProjectIdAtom } from "@/lib/project-editor";
-import { ProjectEditDialog } from "./ProjectEditDialog";
 import {
   createContext,
   useCallback,
@@ -60,9 +57,6 @@ interface ProjectActionsProviderProps {
 export function ProjectActionsProvider({
   children,
 }: ProjectActionsProviderProps) {
-  const [editingProjectId, setEditingProjectId] = useAtom(
-    projectEditorProjectIdAtom,
-  );
   const hosts = useHosts();
   const navigate = useNavigate();
   const { projectId: routeProjectId } = useRouteState();
@@ -155,12 +149,6 @@ export function ProjectActionsProvider({
   return (
     <ProjectActionsContext.Provider value={value}>
       {children}
-      {editingProjectId === null ? null : (
-        <ProjectEditDialog
-          projectId={editingProjectId}
-          onClose={() => setEditingProjectId(null)}
-        />
-      )}
       <ProjectRenameDialog
         target={renameDialog.target}
         pending={updateProject.isPending}

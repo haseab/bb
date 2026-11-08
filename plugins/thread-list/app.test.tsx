@@ -1,18 +1,12 @@
 // @vitest-environment jsdom
 
-import { testPanelController } from "./app/model/test-panel.js";
 import {
-  act,
   cleanup,
   fireEvent,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { getDefaultStore } from "jotai";
-import { quickDecisionsStateAtom } from "./app/decisions/state.js";
-import type { QuickDecision } from "./shared/decisions.js";
-import { makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import {
@@ -20,11 +14,7 @@ import {
   renderSlot,
   type RenderSlotOptions,
 } from "@get-bb/plugin-sdk/testing/app";
-import {
-  makePluginProject,
-  makeSidebarThread,
-  sdkResult,
-} from "./app/model/fixtures.js";
+import { makePluginProject, makeSidebarThread } from "./app/model/fixtures.js";
 import {
   resetPreferencesSyncForTest,
   setPreferencesMirrorStorageForTest,
@@ -33,10 +23,6 @@ import {
   defaultPreferences,
   type PreferenceValues,
 } from "./shared/preferences.js";
-
-import { threadPinCommand } from "./app/pipeline/threadPinCommand.js";
-import { threadCompletionCommand } from "./app/pipeline/threadCompletionCommand.js";
-import { threadPipelineCommands } from "./app/pipeline/threadPipelineCommands.js";
 
 const app = await loadPluginApp(() => import("./app"));
 const registration = app.threadLists[0];
@@ -163,327 +149,11 @@ function threadIds(): string[] {
 
 afterEach(() => {
   cleanup();
-  getDefaultStore().set(quickDecisionsStateAtom, { items: [] });
   resetPreferencesSyncForTest();
   setPreferencesMirrorStorageForTest(undefined);
 });
 
 describe("thread-list plugin", () => {
-  it("completes the focused selector rather than the open thread, and ignores editors", async () => {
-    setPreferencesMirrorStorageForTest(null);
-    const setCompleted = vi.fn((input: unknown) => input);
-    renderList(
-      {},
-      {
-        sdk: {
-          threads: {
-            get: vi.fn(sdkResult(makeThreadResponse({ id: "thr_later" }))),
-          },
-        },
-        rpc: {
-          listPreferences: () => ({ preferences: defaultPreferences() }),
-          setCompleted,
-        },
-      },
-    );
-    await screen.findByText("Parent thread");
-    const context = {
-      threadId: "thr_parent",
-      projectId: "proj_app",
-      openPanel: () => false,
-      experimental_panel: testPanelController,
-    };
-    const selected = document.querySelector<HTMLAnchorElement>(
-      'a[data-sidebar-thread-id="thr_later"]',
-    )!;
-    selected.focus();
-    await waitFor(() =>
-      expect(threadCompletionCommand.isAvailable?.(context)).toBe(true),
-    );
-    await act(async () => threadCompletionCommand.run(context));
-    expect(setCompleted).toHaveBeenCalledWith({
-      threadId: "thr_later",
-      completed: true,
-    });
-    const editor = document.createElement("textarea");
-    document.body.append(editor);
-    editor.focus();
-    expect(threadCompletionCommand.isAvailable?.(context)).toBe(false);
-    await act(async () => threadCompletionCommand.run(context));
-    expect(setCompleted).toHaveBeenCalledTimes(1);
-    editor.remove();
-    expect(threadCompletionCommand.defaultShortcut).toEqual({
-      key: "Enter",
-      mod: true,
-    });
-  });
-
-  it.each(["configured", "named"] as const)(
-    "Cmd+Enter returns a selected Completed thread to Queued (%s section)",
-    async (mode) => {
-      setPreferencesMirrorStorageForTest(null);
-      const setCompleted = vi.fn((_input: unknown) => ({
-        threadId: "thr_later",
-        sectionId: null,
-      }));
-      const prefs = {
-        ...defaultPreferences(),
-        completedSectionId: mode === "configured" ? "sec_later" : null,
-      };
-      const view = renderList(prefs, {
-        sidebarThreads: {
-          projects: PROJECTS,
-          threads: THREADS,
-          sections: SECTIONS.map((section) =>
-            section.id === "sec_later"
-              ? { ...section, name: "Completed" }
-              : section,
-          ),
-        },
-        sdk: {
-          threads: {
-            get: vi.fn(
-              sdkResult(
-                makeThreadResponse({ id: "thr_later", sectionId: "sec_later" }),
-              ),
-            ),
-          },
-        },
-        rpc: { listPreferences: () => ({ preferences: prefs }), setCompleted },
-      });
-      const selected = await screen.findByRole("link", {
-        name: "Open Later thread",
-      });
-      selected.focus();
-      const context = {
-        threadId: "thr_later",
-        projectId: "proj_app",
-        openPanel: () => false,
-        experimental_panel: testPanelController,
-      };
-      await waitFor(() =>
-        expect(threadCompletionCommand.isAvailable?.(context)).toBe(true),
-      );
-      await act(async () => threadCompletionCommand.run(context));
-      expect(setCompleted).toHaveBeenCalledExactlyOnceWith({
-        threadId: "thr_later",
-        completed: false,
-      });
-      expect(view.inspection.navigateCalls).toContainEqual({
-        method: "toThread",
-        threadId: "thr_later",
-        options: { experimental_focusSidebar: true },
-      });
-    },
-  );
-
-  it.each([null, 1])(
-    "toggles the selected thread pin with P (pinnedAt: %s) and ignores editors",
-    async (pinnedAt) => {
-      setPreferencesMirrorStorageForTest(null);
-      const pin = vi.fn(sdkResult({ ok: true }));
-      const unpin = vi.fn(sdkResult({ ok: true }));
-      renderList(
-        {},
-        {
-          sdk: {
-            threads: {
-              get: vi.fn(
-                sdkResult(makeThreadResponse({ id: "thr_later", pinnedAt })),
-              ),
-              pin,
-              unpin,
-            },
-          },
-        },
-      );
-      await screen.findByText("Parent thread");
-      const context = {
-        threadId: "thr_parent",
-        projectId: "proj_app",
-        openPanel: () => false,
-        experimental_panel: testPanelController,
-      };
-      const selected = document.querySelector<HTMLAnchorElement>(
-        'a[data-sidebar-thread-id="thr_later"]',
-      )!;
-      selected.focus();
-      await waitFor(() =>
-        expect(threadPinCommand.isAvailable?.(context)).toBe(true),
-      );
-      fireEvent.keyDown(selected, { key: "p" });
-      await waitFor(() =>
-        expect(pinnedAt === null ? pin : unpin).toHaveBeenCalledOnce(),
-      );
-      expect(pinnedAt === null ? pin : unpin).toHaveBeenCalledExactlyOnceWith({
-        threadId: "thr_later",
-      });
-      expect(pinnedAt === null ? unpin : pin).not.toHaveBeenCalled();
-      expect(document.activeElement).toBe(selected);
-      for (const editor of [
-        document.createElement("input"),
-        document.createElement("textarea"),
-        document.createElement("div"),
-      ]) {
-        if (editor.tagName === "DIV") {
-          editor.setAttribute("contenteditable", "true");
-          editor.tabIndex = 0;
-        }
-        document.body.append(editor);
-        editor.focus();
-        expect(threadPinCommand.isAvailable?.(context)).toBe(false);
-        fireEvent.keyDown(editor, { key: "p" });
-        await act(async () => threadPinCommand.run(context));
-        editor.remove();
-      }
-      expect(pin.mock.calls.length + unpin.mock.calls.length).toBe(1);
-    },
-  );
-
-  it.each(["chronological", "project", "machine"] as const)(
-    "keeps Completed threads in their own section in %s view",
-    async (organizationMode) => {
-      setPreferencesMirrorStorageForTest(null);
-      renderList({ organizationMode, completedSectionId: "sec_later" });
-      await waitFor(() => expect(sectionHeaders()).toContain("Later"));
-      const row = document.querySelector(
-        'a[data-sidebar-thread-id="thr_later"]',
-      )!;
-      expect(
-        row.closest(
-          '[data-sidebar-section-id="section:sec_later"], [data-sidebar-section-id="sec_later"]',
-        ),
-      ).not.toBeNull();
-      expect(
-        document.querySelectorAll('a[data-sidebar-thread-id="thr_later"]'),
-      ).toHaveLength(1);
-    },
-  );
-
-  it.each([
-    ["section-up", "thr_parent", "sec_review"],
-    ["section-down", "thr_later", "sec_review"],
-  ])("%s moves %s to the adjacent section", async (id, threadId, sectionId) => {
-    setPreferencesMirrorStorageForTest(null);
-    const update = vi.fn(sdkResult({ ok: true }));
-    renderList(
-      { organizationMode: "chronological" },
-      { sdk: { threads: { update } } },
-    );
-    await screen.findByText("Parent thread");
-    const command = threadPipelineCommands.find(
-      (command) => command.id === id,
-    )!;
-    const context = {
-      threadId,
-      projectId: "proj_app",
-      openPanel: () => false,
-      experimental_panel: testPanelController,
-    };
-    await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
-    await act(async () => command.run(context));
-    expect(update).toHaveBeenCalledWith({ threadId, sectionId });
-  });
-
-  it.each([
-    ["section-up", "thr_later"],
-    ["section-down", "thr_parent"],
-    ["order-up", "thr_parent"],
-  ])("%s stops at the boundary for %s", async (id, threadId) => {
-    setPreferencesMirrorStorageForTest(null);
-    const update = vi.fn(sdkResult({ ok: true }));
-    renderList(
-      { organizationMode: "chronological" },
-      { sdk: { threads: { update } } },
-    );
-    await screen.findByText("Parent thread");
-    const command = threadPipelineCommands.find(
-      (command) => command.id === id,
-    )!;
-    const context = {
-      threadId,
-      projectId: "proj_app",
-      openPanel: () => false,
-      experimental_panel: testPanelController,
-    };
-    await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
-    await act(async () => command.run(context));
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it("reorders siblings and saves manual order without moving their child separately", async () => {
-    setPreferencesMirrorStorageForTest(null);
-    const slot = renderList({
-      organizationMode: "chronological",
-      threadsSectionLabel: "Queued",
-    });
-    await screen.findByText("Parent thread");
-    const command = threadPipelineCommands.find(
-      (command) => command.id === "order-down",
-    )!;
-    const context = {
-      threadId: "thr_parent",
-      projectId: "proj_app",
-      openPanel: () => false,
-      experimental_panel: testPanelController,
-    };
-    await waitFor(() => expect(command.isAvailable?.(context)).toBe(true));
-    await act(async () => command.run(context));
-    expect(threadIds()).toEqual([
-      "thr_pinned",
-      "thr_later",
-      "thr_personal",
-      "thr_parent",
-      "thr_child",
-    ]);
-    expect(sectionHeaders()).toContain("Queued");
-    await waitFor(() =>
-      expect(slot.inspection.rpcCalls).toContainEqual({
-        method: "setPreference",
-        input: {
-          key: "manualThreadOrder",
-          value: ["thr_personal", "thr_parent"],
-          origin: expect.any(String),
-        },
-      }),
-    );
-  });
-
-  it("restores manual ordering across status and attention changes", async () => {
-    setPreferencesMirrorStorageForTest(null);
-    renderList(
-      {
-        organizationMode: "chronological",
-        chronologicalSort: "manual",
-        manualThreadOrder: ["thr_personal", "thr_parent"],
-      },
-      {
-        sidebarThreads: {
-          projects: PROJECTS,
-          sections: SECTIONS,
-          threads: THREADS.map((thread) =>
-            thread.id === "thr_parent"
-              ? {
-                  ...thread,
-                  status: "active",
-                  latestAttentionAt: 999,
-                  updatedAt: 999,
-                }
-              : thread,
-          ),
-        },
-      },
-    );
-    await screen.findByText("Parent thread");
-    expect(threadIds()).toEqual([
-      "thr_pinned",
-      "thr_later",
-      "thr_personal",
-      "thr_parent",
-      "thr_child",
-    ]);
-  });
-
   it.each([
     ["empty", true],
     ["empty", false],
@@ -542,11 +212,7 @@ describe("thread-list plugin", () => {
     const { rpcCalls } = renderList({ organizationMode: "chronological" });
 
     await screen.findByText("Pinned thread");
-    expect(rpcCalls.map((call) => call.method)).toEqual([
-      "listPreferences",
-      "backlogState",
-      "decisionsState",
-    ]);
+    expect(rpcCalls.map((call) => call.method)).toEqual(["listPreferences"]);
     expect(sectionHeaders()).toEqual(["Pinned", "Later", "Review", "Threads"]);
     expect(threadIds()).toEqual([
       "thr_pinned",
@@ -767,107 +433,4 @@ describe("thread-list plugin", () => {
     link.click();
     await waitFor(() => expect(listProps.onNavigate).toHaveBeenCalledOnce());
   });
-});
-
-it("promotes quick decisions inside Queued and restores manual order after answering", async () => {
-  const threads = ["ordinary", "quick", "instant"].map((id) =>
-    makeSidebarThread({
-      id,
-      title: id,
-      latestAttentionAt: 10,
-      projectId: PERSONAL_PROJECT_ID,
-    }),
-  );
-  const items: QuickDecision[] = [
-    {
-      threadId: "quick",
-      level: "quick",
-      reason: "Brief reply",
-      requestKey: "idle:10:quick",
-      interactionId: null,
-      classifiedAt: 1,
-    },
-    {
-      threadId: "instant",
-      level: "instant",
-      reason: "One choice",
-      requestKey: "idle:10:instant",
-      interactionId: null,
-      classifiedAt: 2,
-    },
-  ];
-  const preferences = {
-    ...defaultPreferences(),
-    chronologicalSort: "manual" as const,
-    manualThreadOrder: ["ordinary", "quick", "instant"],
-  };
-  const slot = renderList(
-    {},
-    {
-      sidebarThreads: { projects: PROJECTS, threads, sections: [] },
-      rpc: {
-        listPreferences: () => ({ preferences }),
-        decisionsState: () => ({ items }),
-      },
-    },
-  );
-  await waitFor(() =>
-    expect(threadIds()).toEqual(["instant", "quick", "ordinary"]),
-  );
-  await act(async () => {
-    await slot.behavior.emitRealtime("quick-decisions", { items: [] });
-  });
-  await waitFor(() =>
-    expect(threadIds()).toEqual(["ordinary", "quick", "instant"]),
-  );
-  expect(
-    slot.inspection.rpcCalls.filter((call) => call.method === "setPreference"),
-  ).toEqual([]);
-});
-
-it("does not overwrite a newer realtime decision with a late initial snapshot", async () => {
-  let finish!: (value: { items: QuickDecision[] }) => void;
-  const thread = makeSidebarThread({
-    id: "instant",
-    title: "Choose a format",
-    projectId: PERSONAL_PROJECT_ID,
-    latestAttentionAt: 10,
-  });
-  const slot = renderList(
-    {},
-    {
-      sidebarThreads: { projects: PROJECTS, threads: [thread], sections: [] },
-      rpc: {
-        listPreferences: () => ({ preferences: defaultPreferences() }),
-        decisionsState: () =>
-          new Promise((resolve) => {
-            finish = resolve;
-          }),
-      },
-    },
-  );
-  await waitFor(() =>
-    expect(
-      slot.inspection.rpcCalls.some((call) => call.method === "decisionsState"),
-    ).toBe(true),
-  );
-  await act(async () => {
-    await slot.behavior.emitRealtime("quick-decisions", {
-      items: [
-        {
-          threadId: thread.id,
-          level: "instant",
-          reason: "One choice",
-          requestKey: "idle:10:request",
-          interactionId: null,
-          classifiedAt: 1,
-        },
-      ],
-    });
-  });
-  expect(screen.getByLabelText("Instant decision: One choice")).toBeTruthy();
-  await act(async () => {
-    finish({ items: [] });
-  });
-  expect(screen.getByLabelText("Instant decision: One choice")).toBeTruthy();
 });

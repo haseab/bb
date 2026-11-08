@@ -36,7 +36,6 @@ const SIDEBAR_ORGANIZE_OPTIONS = [
 ] as const;
 
 const SIDEBAR_SORT_OPTIONS = [
-  { label: "Manual", sort: "manual", direction: "ascending" },
   { label: "Updated at", sort: "updated", direction: "descending" },
   { label: "Created at", sort: "created", direction: "descending" },
   { label: "Alphabetical", sort: "alpha", direction: "ascending" },
@@ -302,7 +301,6 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
     <DropdownMenuGroup aria-label="Sort">
       {SIDEBAR_SORT_OPTIONS.map((option) => {
         const selected = selectedSort === option.sort;
-        const manual = option.sort === "manual";
         const direction =
           savedDirection === "default" ? option.direction : savedDirection;
         const nextDirection = selected
@@ -316,18 +314,18 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
             role="menuitemradio"
             aria-checked={selected}
             aria-label={
-              selected && !manual
+              selected
                 ? `${option.label}, ${direction}. Sort ${nextDirection}`
                 : option.label
             }
             onSelect={(event) => {
               event.preventDefault();
               setSort(option.sort);
-              setDirection(manual ? "default" : nextDirection);
+              setDirection(nextDirection);
             }}
           >
             {option.label}
-            {selected && !manual && (
+            {selected && (
               <span className="sr-only">
                 , {direction}. Sort {nextDirection}
               </span>
@@ -335,13 +333,7 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
             <span className="ml-auto inline-flex size-4 shrink-0 items-center justify-center">
               {selected && (
                 <Icon
-                  name={
-                    manual
-                      ? "Check"
-                      : direction === "ascending"
-                        ? "ArrowUp"
-                        : "ArrowDown"
-                  }
+                  name={direction === "ascending" ? "ArrowUp" : "ArrowDown"}
                   className="size-4"
                 />
               )}

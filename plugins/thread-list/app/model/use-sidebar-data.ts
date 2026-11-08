@@ -1,9 +1,6 @@
 import { createContext, useContext, useMemo } from "react";
 import { useAtomValue } from "jotai";
-import {
-  sidebarAutoActiveSectionIdAtom,
-  sidebarThreadLifecyclesAtom,
-} from "../preferences/atoms.js";
+import { sidebarThreadLifecyclesAtom } from "../preferences/atoms.js";
 import {
   experimental_useSidebarThreads,
   type PluginSidebarProject,
@@ -140,16 +137,12 @@ interface SidebarDataCacheEntry {
   projects: readonly PluginSidebarProject[];
   sections: readonly PluginSidebarSection[];
   hosts: readonly SidebarHost[];
-  autoActiveSectionId: string | null;
   data: SidebarData;
 }
 
 let sidebarDataCache: SidebarDataCacheEntry | null = null;
 
-export function getSidebarData(
-  state: PluginSidebarThreadsState,
-  autoActiveSectionId: string | null = null,
-): SidebarData {
+export function getSidebarData(state: PluginSidebarThreadsState): SidebarData {
   const cached = sidebarDataCache;
   const hosts = state.experimental_hosts ?? EMPTY_HOSTS;
   if (
@@ -158,31 +151,13 @@ export function getSidebarData(
     cached.threads === state.threads &&
     cached.projects === state.projects &&
     cached.sections === state.sections &&
-    cached.hosts === hosts &&
-    cached.autoActiveSectionId === autoActiveSectionId
+    cached.hosts === hosts
   ) {
     return cached.data;
   }
-  const sectionId = state.sections.some(
-    (section) => section.id === autoActiveSectionId,
-  )
-    ? autoActiveSectionId
-    : null;
-  const threads =
-    sectionId === null
-      ? state.threads
-      : state.threads.map((thread) =>
-          thread.status === "active" &&
-          thread.sectionId === null &&
-          thread.parentThreadId === null &&
-          thread.pinnedAt === null &&
-          thread.archivedAt === null
-            ? { ...thread, sectionId }
-            : thread,
-        );
   const data = buildSidebarData(
     state.status,
-    threads,
+    state.threads,
     state.projects,
     state.sections,
     hosts,
@@ -194,7 +169,6 @@ export function getSidebarData(
     projects: state.projects,
     sections: state.sections,
     hosts,
-    autoActiveSectionId,
     data,
   };
   return data;
@@ -219,16 +193,12 @@ export function useSidebarProjectName(
 
 export function useSidebarData() {
   const lifecycles = useAtomValue(sidebarThreadLifecyclesAtom);
-  const autoActiveSectionId = useAtomValue(sidebarAutoActiveSectionIdAtom);
   const state = experimental_useSidebarThreads({
     experimental_lifecycles: lifecycles,
   });
   return useMemo(
-    () => ({
-      ...getSidebarData(state, autoActiveSectionId),
-      archived: state.experimental_archived,
-    }),
-    [state, autoActiveSectionId],
+    () => ({ ...getSidebarData(state), archived: state.experimental_archived }),
+    [state],
   );
 }
 

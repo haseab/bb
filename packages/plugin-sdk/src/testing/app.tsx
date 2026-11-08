@@ -371,7 +371,6 @@ interface SlotEnv {
   sidebarNavigation: ExperimentalSidebarNavigationState;
   sidebarNavigationCalls: SidebarNavigationCall[];
   environmentArchiveCalls: string[];
-  projectEditorCalls: string[];
   threadActions: TestThreadActionsResolver;
   threadBulkActions: TestThreadBulkActionsResolver;
   threadActionRegistrations: readonly PluginThreadActionRegistrationInfo[];
@@ -1906,17 +1905,6 @@ const testPluginSdkApp = {
       options,
     );
   },
-  experimental_useProjectEditor(): (projectId: string) => void {
-    const calls = useSlotEnv(
-      "experimental_useProjectEditor",
-    ).projectEditorCalls;
-    return useCallback(
-      (projectId: string) => {
-        calls.push(projectId);
-      },
-      [calls],
-    );
-  },
   experimental_useArchiveEnvironmentThreads(): (
     environmentId: string,
   ) => Promise<void> {
@@ -2556,8 +2544,6 @@ export interface RenderedSlotInspectionState {
    * call, in order.
    */
   readonly experimental_environmentArchiveCalls: string[];
-  /** Every project id passed to the host project editor. */
-  readonly experimental_projectEditorCalls: string[];
   /** Every `useSdk()` call, in order, as `"<area>.<method>"`. */
   readonly sdkCalls: SdkCall[];
   /** Every `experimental_copyToClipboard()` write, in order. */
@@ -2964,7 +2950,6 @@ export function renderSlot<
     },
   };
   const environmentArchiveCalls: string[] = [];
-  const projectEditorCalls: string[] = [];
   const sidebarDraftThreadIds: ReadonlySet<string> = new Set(
     options.sidebarDraftThreadIds ?? [],
   );
@@ -3402,7 +3387,6 @@ export function renderSlot<
     sidebarNavigation,
     sidebarNavigationCalls,
     environmentArchiveCalls,
-    projectEditorCalls,
     threadActions: options.threadActions ?? NO_THREAD_ACTIONS,
     threadBulkActions: options.threadBulkActions ?? NO_THREAD_BULK_ACTIONS,
     threadActionRegistrations:
@@ -3544,7 +3528,6 @@ export function renderSlot<
     sidebarActionCalls,
     sidebarNavigationCalls,
     experimental_environmentArchiveCalls: environmentArchiveCalls,
-    experimental_projectEditorCalls: projectEditorCalls,
     sdkCalls,
     experimental_clipboardWrites,
     composer: composerLog,
@@ -3566,7 +3549,6 @@ export function renderSlot<
       sidebarActionCalls,
       sidebarNavigationCalls,
       experimental_environmentArchiveCalls: environmentArchiveCalls,
-      experimental_projectEditorCalls: projectEditorCalls,
       sdkCalls,
       experimental_clipboardWrites,
       composer: composerLog,

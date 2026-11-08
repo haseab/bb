@@ -18,7 +18,6 @@ export const chronologicalSortSchema = z.enum([
   "created",
   "alpha",
   "none",
-  "manual",
 ]);
 export type ChronologicalSort = z.infer<typeof chronologicalSortSchema>;
 
@@ -119,12 +118,6 @@ export const preferenceDefinitions = {
     "Thread lifecycles shown in the list: active, archived, or both. At least one is required.",
     null,
   ),
-  completedSectionId: definePreference(
-    listItemSchema.nullable(),
-    null,
-    "Section used by Complete and Reopen. Created or adopted on first completion; null means no completion section has been chosen.",
-    null,
-  ),
   organizationMode: definePreference(
     organizationModeSchema,
     "chronological",
@@ -137,46 +130,10 @@ export const preferenceDefinitions = {
     "Whether sibling threads sharing a worktree collapse into one row. auto groups them in every organization except chronological.",
     "sidebar.threadGrouping.environment",
   ),
-  quickDecisions: definePreference(
-    z.boolean(),
-    true,
-    "Use the existing Codex login to classify new decision requests, tint their dots red, and promote quick decisions in Queued. No history backfill.",
-    null,
-  ),
   groupByReadStatus: definePreference(
     z.boolean(),
     false,
     "List threads that show an unread dot above the rest, keeping the selected sort within each group. The open thread keeps its place until another thread is opened.",
-    null,
-  ),
-  backlogSectionId: definePreference(
-    listItemSchema.nullable(),
-    null,
-    "Backlog section for follow-up scheduling. null adopts the section named Backlog; a deleted configured section disables refresh until reconfigured.",
-    null,
-  ),
-  backlogRefreshDays: definePreference(
-    z.number().int().min(1).max(3650),
-    7,
-    "Default days before a newly backlogged thread returns below the refreshed queue divider. Explicit follow-up dates override this policy.",
-    null,
-  ),
-  autoActiveSectionId: definePreference(
-    listItemSchema.nullable(),
-    null,
-    "Move unsectioned queued and completed root threads to this section when they become active, at the top of manual order, and return idle threads in this section to the queue. Other sections are preserved. null disables this rule.",
-    null,
-  ),
-  manualThreadOrder: definePreference(
-    stringListSchema,
-    [],
-    "Thread ids in manual display order. Used when chronologicalSort is manual.",
-    null,
-  ),
-  threadsSectionLabel: definePreference(
-    z.string().trim().min(1).max(128),
-    "Threads",
-    "Label for unsectioned threads, such as Queued in a manual pipeline.",
     null,
   ),
   chronologicalSort: definePreference(
@@ -223,8 +180,8 @@ export const preferenceDefinitions = {
       .refine((value) => value.length <= THREAD_ROW_ACTION_LIMIT, {
         message: `Choose at most ${THREAD_ROW_ACTION_LIMIT} row actions`,
       }),
-    ["thread-list/complete"],
-    `Up to ${THREAD_ROW_ACTION_LIMIT} quick actions shown on a thread row's hover, left to right before its actions menu, as thread action keys: bb--core/split, bb--core/copyLink, bb--core/read, bb--core/pin, thread-list/move, bb--core/rename, thread-list/complete, bb--core/archive, or a plugin's <pluginId>/<actionId>. Bare legacy ids such as archive and core/<id> keys are accepted. An empty list shows only the menu.`,
+    ["bb--core/archive"],
+    `Up to ${THREAD_ROW_ACTION_LIMIT} quick actions shown on a thread row's hover, left to right before its actions menu, as thread action keys: bb--core/split, bb--core/copyLink, bb--core/read, bb--core/pin, thread-list/move, bb--core/rename, bb--core/archive, or a plugin's <pluginId>/<actionId>. Bare legacy ids such as archive and core/<id> keys are accepted. An empty list shows only the menu.`,
     null,
   ),
   collapsedSections: definePreference(

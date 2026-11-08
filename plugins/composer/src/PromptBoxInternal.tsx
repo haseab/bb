@@ -1,4 +1,3 @@
-import { handlePromptListEnter } from "./editor/prompt-editor-list-enter";
 import {
   experimental_ComposerRoot as ComposerRoot,
   experimental_FailedVoiceRecordings as FailedVoiceRecordings,
@@ -1998,17 +1997,10 @@ export function PromptBoxInternal({
           event.preventDefault();
           if (pastedValue.text.length === 0) return true;
 
-          const markdownContent =
-            promptEditorContentFromValue(pastedValue).content ?? [];
-          const pastedContent =
-            markdownContent.length === 1 &&
-            markdownContent[0]?.type === "paragraph"
-              ? (markdownContent[0].content ?? [])
-              : markdownContent;
           editorRef.current
             ?.chain()
             .focus()
-            .insertContent(pastedContent)
+            .insertContent(promptEditorInlineContentFromValue(pastedValue))
             .setMeta("uiEvent", "paste")
             .setMeta(promptThreadLinkPasteKey, threadLinkMetadata(pastedValue))
             .run();
@@ -2125,11 +2117,7 @@ export function PromptBoxInternal({
 
     const focusEditor = () => {
       if (editor.isDestroyed) return;
-      if (
-        document.activeElement?.closest(
-          "[data-sidebar-rename-editor], a[data-sidebar-thread-id]",
-        )
-      )
+      if (document.activeElement?.closest("[data-sidebar-rename-editor]"))
         return;
       focusEditorAtEnd(editor);
       scheduleRevealEditorSelection();
@@ -2932,7 +2920,9 @@ export function PromptBoxInternal({
       popups,
     ],
   );
-  const showStop = Boolean(isRunning && onStop && !showVoiceActionGroup);
+  const showStop = Boolean(
+    isRunning && onStop && !canSubmit && !isAttaching && !showVoiceActionGroup,
+  );
   const canStartVoiceInput =
     voice !== undefined && voice.isSupported && !isSubmitting;
   const showVoiceAsPrimaryAction =
@@ -3201,10 +3191,6 @@ export function PromptBoxInternal({
           onEscape();
           return true;
         }
-        if (isRunning && onStop) {
-          onStop();
-          return true;
-        }
         blurPromptEditor(currentEditor);
         return true;
       }
@@ -3260,10 +3246,6 @@ export function PromptBoxInternal({
         return true;
       }
 
-      if (currentEditor && handlePromptListEnter(currentEditor, event)) {
-        return true;
-      }
-
       const isBlockquoteExitKey =
         event.key === "Enter" &&
         event.shiftKey &&
@@ -3312,10 +3294,8 @@ export function PromptBoxInternal({
       handleComposerMenuKeyDown,
       history,
       isPointerCoarse,
-      isRunning,
       onEscape,
       onModifierSubmit,
-      onStop,
       postCompositionKeyDownEvents,
       resetHistorySession,
       selectedIndex,
@@ -3669,9 +3649,7 @@ export function PromptBoxInternal({
                           className="size-3.5 fill-current [&_*]:stroke-0"
                         />
                       </Button>
-                    ) : null}
-                    {showStop &&
-                    !canSubmit ? null : showVoiceAsPrimaryAction ? (
+                    ) : showVoiceAsPrimaryAction ? (
                       <VoiceInputButton
                         warning={voice?.microphoneWarning ?? null}
                         data-promptbox-submit-action=""

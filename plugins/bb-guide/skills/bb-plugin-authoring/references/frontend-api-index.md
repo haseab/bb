@@ -72,7 +72,6 @@ Read the installed SDK declarations for the exact current signatures.
 - `experimental_useSidebarThreads`
 - `experimental_useSidebarThreadActions`
 - `experimental_useArchiveEnvironmentThreads`
-- `experimental_useProjectEditor`
 - `experimental_useThreadActions`
 - `experimental_useThreadActionRegistrations`
 - `experimental_ThreadActionsMenu`

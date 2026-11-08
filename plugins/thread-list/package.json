@@ -6,7 +6,7 @@
   "description": "bb's sidebar thread list: pinned threads, custom sections, projects, machines, and nested threads.",
   "engines": {
     "bb": ">=0.0",
-    "bbPluginSdk": ">=0.6.132"
+    "bbPluginSdk": ">=0.6.112"
   },
   "bb": {
     "name": "Thread list",
@@ -37,8 +37,7 @@
     "@radix-ui/react-compose-refs": "^1.1.5",
     "@radix-ui/react-slot": "^1.5.0",
     "jotai": "^2.20.3",
-    "zod": "^4.6.7",
-    "chrono-node": "^2.10.1"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@bb/plugin-build": "workspace:*",

@@ -493,22 +493,6 @@ describe("ProjectRow interactions", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("opens the host project editor from the project context menu", async () => {
-    const { experimental_projectEditorCalls } = renderProjectRow(vi.fn(), {
-      status: "ready",
-      threads: [],
-    });
-    const row = document.querySelector<HTMLElement>(
-      '[data-sidebar-project-id="proj_test"]',
-    );
-    expect(row).not.toBeNull();
-    fireEvent.contextMenu(row!, { button: 2, clientX: 10, clientY: 10 });
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Edit project…" }),
-    );
-    expect(experimental_projectEditorCalls).toEqual(["proj_test"]);
-  });
-
   it("links project settings and confirms removal through the SDK", async () => {
     const remove = vi.fn(sdkResult({ ok: true }));
     const { sdkCalls } = renderProjectRow(

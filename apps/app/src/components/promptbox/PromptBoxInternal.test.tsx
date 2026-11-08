@@ -1415,36 +1415,6 @@ describe("ComposerBox controlled value sync", () => {
     }
   });
 
-  it("preserves sidebar thread focus during passive autofocus and permits explicit composer focus", async () => {
-    const restoreMatchMedia = mockPointerCoarse(false);
-    const link = document.createElement("a");
-    link.href = "#selected-thread";
-    link.setAttribute("data-sidebar-thread-id", "selected-thread");
-    document.body.append(link);
-    try {
-      const promptBoxRef = createRef<PromptBoxHandle>();
-      const props = createPromptBoxProps({ autoFocus: false, promptBoxRef });
-      const view = render(<ComposerBox {...props} />);
-      await waitFor(() =>
-        expect(getPromptEditorElement()).toBeInstanceOf(HTMLElement),
-      );
-      link.focus();
-      view.rerender(<ComposerBox {...props} autoFocus />);
-      await act(
-        () =>
-          new Promise<void>((resolve) =>
-            requestAnimationFrame(() => resolve()),
-          ),
-      );
-      expect(document.activeElement).toBe(link);
-      act(() => promptBoxRef.current?.focusEnd());
-      await waitForPromptFocus();
-    } finally {
-      link.remove();
-      restoreMatchMedia();
-    }
-  });
-
   it("releases passive editor focus when autofocus becomes blocked", async () => {
     const restoreMatchMedia = mockPointerCoarse(false);
     try {
@@ -2559,41 +2529,6 @@ describe("ComposerBox submit shortcuts", () => {
 });
 
 describe("ComposerBox escape", () => {
-  it.each(["", "Keep this draft"])(
-    "stops a running thread with Escape and the button while preserving draft %j",
-    async (value) => {
-      const onStop = vi.fn();
-      const onSubmit = vi.fn();
-      const promptBoxRef = createRef<PromptBoxHandle>();
-      render(
-        <ComposerBox
-          {...createPromptBoxProps({
-            value,
-            onSubmit,
-            submission: { isRunning: true, onStop },
-          })}
-          promptBoxRef={promptBoxRef}
-        />,
-      );
-      await focusPromptEnd(promptBoxRef);
-      const editor = getPromptEditorElement();
-
-      expect(fireEvent.keyDown(editor, { key: "Escape" })).toBe(false);
-      expect(onStop).toHaveBeenCalledOnce();
-      expect(document.activeElement).toBe(editor);
-      expect(editor.textContent).toBe(value);
-      expect(onSubmit).not.toHaveBeenCalled();
-
-      fireEvent.click(screen.getByRole("button", { name: "Stop run" }));
-      expect(onStop).toHaveBeenCalledTimes(2);
-      expect(editor.textContent).toBe(value);
-      if (value) {
-        fireEvent.keyDown(editor, { key: "Enter" });
-        expect(onSubmit).toHaveBeenCalledOnce();
-      }
-    },
-  );
-
   it("blurs the editor when no host Escape action is provided", async () => {
     const promptBoxRef = createRef<PromptBoxHandle>();
     render(
@@ -2613,15 +2548,10 @@ describe("ComposerBox escape", () => {
 
   it("routes Escape to onEscape instead of blurring the editor", async () => {
     const onEscape = vi.fn();
-    const onStop = vi.fn();
     const promptBoxRef = createRef<PromptBoxHandle>();
     render(
       <ComposerBox
-        {...createPromptBoxProps({
-          onEscape,
-          value: "Edited message",
-          submission: { isRunning: true, onStop },
-        })}
+        {...createPromptBoxProps({ onEscape, value: "Edited message" })}
         promptBoxRef={promptBoxRef}
       />,
     );
@@ -2632,7 +2562,6 @@ describe("ComposerBox escape", () => {
     });
 
     expect(onEscape).toHaveBeenCalledTimes(1);
-    expect(onStop).not.toHaveBeenCalled();
     expect(wasNotCanceled).toBe(false);
     expect(document.activeElement).toBe(getPromptEditorElement());
   });

@@ -560,7 +560,7 @@ const MARKDOWN_LOCAL_FILE_LINK_ICON = (
   <Icon
     name="ExternalLink"
     aria-hidden
-    className="ml-1 inline size-3 align-[-0.125em]"
+    className="ml-1 inline size-3 align-[-0.125em] text-subtle-foreground"
   />
 );
 
@@ -669,7 +669,7 @@ function MarkdownAnchor({
       }
       href={anchorHref}
       className={cn(
-        "break-words text-file-accent [overflow-wrap:anywhere] no-underline underline-offset-2 hover:underline focus-visible:underline [&_code]:text-inherit",
+        "break-words [overflow-wrap:anywhere] underline underline-offset-2",
       )}
       target={linkTarget.kind === "fragment" ? undefined : "_blank"}
       rel="noopener noreferrer"
@@ -864,7 +864,7 @@ function MarkdownCode({
 
   const code = (
     <code
-      className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground"
+      className="rounded bg-muted/70 px-1.5 py-0.5 font-mono text-xs"
       {...props}
     >
       {children}

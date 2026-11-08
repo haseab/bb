@@ -56,7 +56,6 @@ import {
 } from "../list/customizeRowActionsContext.js";
 
 installTestPluginRuntime();
-const { quickDecisionsStateAtom } = await import("../decisions/state.js");
 const { SidebarDraftPresenceSync } =
   await import("../list/sidebarDraftPresence.js");
 const { ThreadRowNavigationProvider } =
@@ -214,7 +213,7 @@ function renderThreadRow({
   experiments,
   ...harness
 }: RenderThreadRowArgs = {}): RenderedSlot & {
-  rerenderThreadRow(nextThread: PluginSidebarThread, isActive?: boolean): void;
+  rerenderThreadRow(nextThread: PluginSidebarThread): void;
 } {
   const slot = renderSlot(
     { component: ThreadRowHarness },
@@ -246,14 +245,13 @@ function renderThreadRow({
     },
   );
   return Object.assign(slot, {
-    rerenderThreadRow(nextThread: PluginSidebarThread, isActive?: boolean) {
+    rerenderThreadRow(nextThread: PluginSidebarThread) {
       slot.lifecycle.rerender(
         <ThreadRowHarness
           thread={nextThread}
           projects={projects}
           providers={providers}
           {...harness}
-          isActive={isActive ?? harness.isActive}
         />,
       );
     },
@@ -356,9 +354,6 @@ function hostThreadActions({
     });
     const isArchived = thread.archivedAt !== null;
     return [
-      ...(!isArchived
-        ? [entry("thread-list/complete", "Complete", "Check")]
-        : []),
       entry("bb--core/copyLink", "Copy link", "Copy"),
       entry(
         "bb--core/pin",
@@ -447,17 +442,6 @@ describe("ThreadRow", () => {
     expect(screen.getByRole("img", { name: "Test Provider" })).toBeTruthy();
     expect(slot.inspection.navigateCalls).toEqual([]);
 
-    const icon = slot.container.querySelector("[data-sidebar-thread-provider]");
-    expect(icon?.getAttribute("aria-description")).toBe("Created in bb");
-    slot.rerenderThreadRow(
-      createThread({ experimental_creationSource: "native" }),
-    );
-    expect(
-      slot.container
-        .querySelector("[data-sidebar-thread-provider]")
-        ?.getAttribute("aria-description"),
-    ).toBe("Imported from provider-test");
-
     slot.rerenderThreadRow(createThread({ providerId: "missing" }));
     expect(screen.queryByRole("img", { name: "Test Provider" })).toBeNull();
     expect(
@@ -469,30 +453,6 @@ describe("ThreadRow", () => {
     expect(
       slot.container.querySelector("[data-sidebar-thread-provider]"),
     ).toBeNull();
-
-    act(() => getDefaultStore().set(sidebarShowProviderIconsAtom, true));
-    const codex = renderThreadRow({
-      providers: [{ ...provider, id: "codex" }],
-      thread: createThread({ providerId: "codex" }),
-    });
-    const bbIcon = codex.container.querySelector<HTMLElement>(
-      "[data-sidebar-thread-provider]",
-    );
-    expect(bbIcon?.getAttribute("data-thread-origin")).toBe("bb");
-    expect(bbIcon?.style.color).toContain("300");
-    codex.rerenderThreadRow(
-      createThread({
-        providerId: "codex",
-        experimental_creationSource: "native",
-      }),
-    );
-    const nativeIcon = codex.container.querySelector<HTMLElement>(
-      "[data-sidebar-thread-provider]",
-    );
-    expect(nativeIcon?.style.color).toBe("");
-    expect(nativeIcon?.getAttribute("aria-description")).toBe(
-      "Imported from Codex",
-    );
   });
 
   it("links the row to the thread href and leaves a plain click to the host", () => {
@@ -1149,50 +1109,6 @@ describe("ThreadRow", () => {
     expect(screen.queryByText(/@thread:thr_mentioned/)).toBeNull();
   });
 
-  it.each([
-    ["deeplog", "DL"],
-    ["unplan", "UP"],
-    ["smash-leaderboard", "SL"],
-    ["general", "GL"],
-    ["os-v2", "COS"],
-    ["os-web", "COS"],
-    ["inbox0", "i0"],
-    ["guestbook", "GB"],
-    ["retrace", "RT"],
-    ["Web App", "WA"],
-    ["new-project", "NP"],
-    ["example", "EX"],
-  ])("shows the %s project badge as %s and opens its thread", (name, label) => {
-    getDefaultStore().set(
-      preferenceValueAtom("organizationMode"),
-      "chronological",
-    );
-    const { container } = renderThreadRow({
-      projects: [
-        {
-          id: "proj_test",
-          name,
-          isPersonal: false,
-          href: "/projects/proj_test",
-          settingsHref: "/projects/proj_test/settings",
-        },
-      ],
-    });
-    const badge = screen.getByRole("img", { name: `In project ${name}` });
-    expect(badge.textContent).toBe(label);
-    expect(
-      badge.parentElement?.querySelector(".bb-thread-title"),
-    ).not.toBeNull();
-    expect(container.querySelector("[data-sidebar-thread-project]")).toBe(
-      badge,
-    );
-    const link = screen.getByRole("link", { name: "Open Thread" });
-    const click = vi.fn((event: Event) => event.preventDefault());
-    link.addEventListener("click", click);
-    fireEvent.click(badge);
-    expect(click).toHaveBeenCalledOnce();
-  });
-
   it("marks a child from another project with the project name", () => {
     const { container } = renderThreadRow({
       crossProjectId: "proj_other",
@@ -1371,7 +1287,7 @@ describe("ThreadRow", () => {
         ),
       ).toEqual([
         toggle.getAttribute("aria-label"),
-        "Complete",
+        "Archive",
         "Thread actions",
       ]);
       fireEvent.click(toggle);
@@ -1763,54 +1679,6 @@ describe("ThreadRow", () => {
     expect(renderedIndicators()).toEqual(["unread-success"]);
   });
 
-  it("opens an inactive row before Enter starts renaming the active row", async () => {
-    const thread = createThread();
-    const slot = renderThreadRow({ thread });
-    const link = screen.getByRole("link", { name: "Open Thread" });
-    link.focus();
-    expect(fireEvent.keyDown(link, { key: "Enter" })).toBe(true);
-    expect(screen.queryByRole("textbox", { name: "Thread name" })).toBeNull();
-    link.blur();
-    slot.rerenderThreadRow(thread, true);
-    await waitFor(() => expect(document.activeElement).toBe(link));
-    expect(fireEvent.keyDown(link, { key: "Enter" })).toBe(false);
-    expect(
-      await screen.findByRole("textbox", { name: "Thread name" }),
-    ).toHaveProperty("value", "Thread");
-  });
-
-  it("renames the open thread on Enter and saves with Enter", async () => {
-    const slot = renderThreadRow({
-      isActive: true,
-      sdk: { threads: { update: vi.fn().mockResolvedValue({}) } },
-    });
-    const link = screen.getByRole("link", { name: "Open Thread" });
-    for (const modifiers of [
-      { metaKey: true },
-      { ctrlKey: true },
-      { altKey: true },
-      { shiftKey: true },
-      { repeat: true },
-    ]) {
-      expect(fireEvent.keyDown(link, { key: "Enter", ...modifiers })).toBe(
-        true,
-      );
-    }
-    expect(screen.queryByRole("textbox", { name: "Thread name" })).toBeNull();
-    fireEvent.keyDown(link, { key: "Enter" });
-    const input = await screen.findByRole("textbox", { name: "Thread name" });
-    fireEvent.change(input, { target: { value: "Keyboard rename" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() =>
-      expect(slot.inspection.sdkCalls).toEqual([
-        {
-          method: "threads.update",
-          args: [{ threadId: "thr_test", title: "Keyboard rename" }],
-        },
-      ]),
-    );
-  });
-
   it("edits the row title inline after a double click and commits on Enter", async () => {
     const slot = renderThreadRow({
       sdk: { threads: { update: vi.fn().mockResolvedValue({}) } },
@@ -2013,72 +1881,5 @@ describe("ThreadRow", () => {
     expect(
       await screen.findByRole("textbox", { name: "Thread name" }),
     ).toHaveProperty("value", "Thread");
-  });
-});
-
-describe("quick-decision dots", () => {
-  afterEach(() => {
-    getDefaultStore().set(quickDecisionsStateAtom, { items: [] });
-  });
-  function mark(
-    thread: PluginSidebarThread,
-    level: "instant" | "quick" = "instant",
-  ) {
-    getDefaultStore().set(quickDecisionsStateAtom, {
-      items: [
-        {
-          threadId: thread.id,
-          requestKey: `idle:${thread.latestAttentionAt}:request`,
-          interactionId: null,
-          classifiedAt: 1,
-          level,
-          reason: "Choose an export format",
-        },
-      ],
-    });
-  }
-  it("replaces the unread dot with red and keeps it after opening and reading", () => {
-    const thread = createThread();
-    mark(thread);
-    const slot = renderThreadRow({ thread });
-    expect(statusGlyph().getAttribute("data-decision-level")).toBe("instant");
-    expect(statusGlyph().style.backgroundColor).toBe("var(--destructive)");
-    slot.rerenderThreadRow(
-      { ...thread, isUnread: false, lastReadAt: thread.latestAttentionAt + 1 },
-      true,
-    );
-    expect(
-      screen.getByLabelText("Instant decision: Choose an export format"),
-    ).toBeTruthy();
-  });
-  it("uses a softer red for a quick decision and restores ordinary unread appearance when answered", async () => {
-    const thread = createThread();
-    mark(thread, "quick");
-    renderThreadRow({ thread });
-    expect(statusGlyph().style.backgroundColor).toContain("color-mix");
-    await act(async () => {
-      getDefaultStore().set(quickDecisionsStateAtom, { items: [] });
-    });
-    expect(renderedIndicators()).toEqual(["unread-success"]);
-  });
-  it("keeps errors and ongoing work ahead of decision dots", () => {
-    const thread = createThread({ status: "error" });
-    mark(thread);
-    const slot = renderThreadRow({ thread });
-    expect(renderedIndicators()).toEqual(["unread-error"]);
-    slot.rerenderThreadRow({
-      ...thread,
-      status: "active",
-      runtimeStatus: "active",
-    });
-    expect(renderedIndicators()).toEqual(["runtime"]);
-  });
-  it("keeps an outstanding decision visible while its thread is open in a split", () => {
-    const thread = createThread();
-    mark(thread);
-    renderSplitThreadRow({ thread });
-    expect(
-      screen.getByLabelText("Instant decision: Choose an export format"),
-    ).toBeTruthy();
   });
 });

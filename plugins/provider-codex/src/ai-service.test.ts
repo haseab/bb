@@ -115,32 +115,3 @@ describe("Codex AI service", () => {
     });
   });
 });
-
-it("shares the existing Codex AI completion path through plugin RPC", async () => {
-  const { bb, harness } = createFakePluginHost({
-    pluginId: "provider-codex",
-    sdk: { system: { config: async () => ({ primaryHostId: "host-1" }) } },
-    experimental_callHostRpc: async () => ({
-      ok: true,
-      text: '{"level":"instant","reason":"Choose a format"}',
-    }),
-  });
-  try {
-    registerCodexAiService(bb);
-    expect(
-      await harness.behavior.callRpc("ai.complete", {
-        prompt: "Classify this decision",
-      }),
-    ).toEqual({ text: '{"level":"instant","reason":"Choose a format"}' });
-    expect(harness.inspection.experimental_hostRpcCalls[0]).toMatchObject({
-      hostId: "host-1",
-      method: "codex.ai.complete",
-      input: { prompt: "Classify this decision" },
-    });
-    await expect(
-      harness.behavior.callRpc("ai.complete", { prompt: "x".repeat(24_001) }),
-    ).rejects.toThrow();
-  } finally {
-    await harness.lifecycle.dispose();
-  }
-});

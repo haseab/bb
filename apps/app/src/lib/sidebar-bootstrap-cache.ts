@@ -1,4 +1,3 @@
-import { isInMemoryThreadPreview } from "./in-memory-thread-preview";
 import {
   sidebarBootstrapResponseSchema,
   type SidebarBootstrapResponse,
@@ -45,7 +44,6 @@ function boundSidebarBootstrapForCache(
 let replay: SidebarBootstrapResponse | null | undefined;
 
 export function readCachedSidebarBootstrap(): SidebarBootstrapResponse | null {
-  if (isInMemoryThreadPreview()) return null;
   if (replay === undefined) {
     replay = sidebarBootstrapCache.read(SIDEBAR_BOOTSTRAP_CACHE_KEY);
   }
@@ -64,7 +62,6 @@ function flushPendingWrite(): void {
 export function writeCachedSidebarBootstrap(
   response: SidebarBootstrapResponse,
 ): void {
-  if (isInMemoryThreadPreview()) return;
   let bounded: SidebarBootstrapResponse;
   try {
     bounded = boundSidebarBootstrapForCache(response);
