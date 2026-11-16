@@ -7,6 +7,7 @@ import { PromptStackCard } from "@/components/promptbox/banner/PromptStackCard";
 
 interface InlineMessageEditorFrameProps {
   cancelLabel: string;
+  cancelDisabled?: boolean;
   children: ReactNode;
   label: string;
   onCancel: () => void;
@@ -15,6 +16,7 @@ interface InlineMessageEditorFrameProps {
 
 export function InlineMessageEditorFrame({
   cancelLabel,
+  cancelDisabled = false,
   children,
   label,
   onCancel,
@@ -37,6 +39,7 @@ export function InlineMessageEditorFrame({
         variant="ghost"
         className="ml-auto size-6 shrink-0 text-subtle-foreground"
         onClick={onCancel}
+        disabled={cancelDisabled}
         aria-label={cancelLabel}
       >
         <Icon name="X" className="size-3" aria-hidden />

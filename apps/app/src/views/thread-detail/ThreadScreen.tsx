@@ -6,14 +6,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { nanoid } from "nanoid";
 import { defaultAppSettings, type Environment } from "@bb/domain";
-import type { ThreadResponse, TimelineRow } from "@bb/server-contract";
+import type { ThreadResponse } from "@bb/server-contract";
 import {
   appendQuoteAndAttachmentsToDraft,
-  promptInputToDraft,
   type PromptDraftAttachment,
-  type PromptDraftState,
   type PromptMentionLinkResolver,
 } from "@bb/client-core";
 import { cn } from "@bb/shared-ui/lib/utils";
@@ -24,10 +21,7 @@ import {
   ThreadTimelineSurface,
   type ThreadTimelineAddToChatHandler,
   type ThreadTimelineConsumerMessageAction,
-  type ThreadTimelineEditMessageHandler,
-  type ThreadTimelineEditMessageTarget,
   type ThreadTimelineForkMessageHandler,
-  type ThreadTimelineInlineMessageEditor,
   type ThreadTimelineUnreadDividerPlacement,
   type TimelineTitleActionResolver,
   type UseThreadTimelineControllerResult,
@@ -42,7 +36,6 @@ import {
 } from "@/components/plugin/PluginThreadContextCard";
 import { BottomAnchoredScrollBody } from "@/components/ui/bottom-anchored-scroll-body";
 import { PageShell } from "@/components/ui/page-shell.js";
-import { appToast } from "@/components/ui/app-toast";
 import { SelectionAddToChatContext } from "@/components/thread/SelectionAddToChatContext";
 import {
   isThreadDisplayStatusBannerActive,
@@ -57,9 +50,9 @@ import {
   subscribeComposerFocusRequests,
 } from "@/lib/composer-focus-requests";
 import { getThreadDisplayTitle } from "@/lib/thread-title";
+import { useSentMessageEditing } from "./useSentMessageEditing";
 import { useParentThreadSection } from "./useParentThreadSection";
 import { getThreadRoutePath } from "@/lib/route-paths";
-import { showMutationErrorToast } from "@/lib/mutation-errors";
 import { getPromptDraftAccessor } from "@/hooks/usePromptDraftStorage";
 import { useSystemConfig } from "@/hooks/queries/system-queries";
 import {
@@ -70,14 +63,10 @@ import {
   useChildThreadPendingAttention,
   type ChildThreadPendingAttentionSource,
 } from "@/hooks/queries/child-thread-pending-interactions";
-import {
-  useEditThreadMessage,
-  useSendThreadMessage,
-} from "@/hooks/mutations/thread-runtime-mutations";
+import { useSendThreadMessage } from "@/hooks/mutations/thread-runtime-mutations";
 import {
   ThreadDetailPromptArea,
   type ThreadComposerPermissionPolicy,
-  type ThreadDetailSentMessageEdit,
 } from "./ThreadDetailPromptArea";
 
 const THREAD_DETAIL_COMPOSER_ID = "thread-detail-follow-up-composer";
@@ -124,26 +113,6 @@ interface ThreadScreenProps {
   thread: ThreadResponse;
   timeline: UseThreadTimelineControllerResult;
   timelineHost: ThreadScreenTimelineHost;
-}
-
-interface SentMessageEditSession {
-  draft: PromptDraftState;
-  operationId: string;
-  target: ThreadTimelineEditMessageTarget;
-  threadId: string;
-}
-
-function hasTimelineRowId(
-  rows: readonly TimelineRow[],
-  rowId: string,
-): boolean {
-  return rows.some(
-    (row) =>
-      row.id === rowId ||
-      (row.kind === "turn" &&
-        row.children !== null &&
-        hasTimelineRowId(row.children, rowId)),
-  );
 }
 
 function buildHostConnectionNotice(
@@ -252,174 +221,6 @@ function useChildThreadsSection(
       );
     return { ...childThreadsSection, pendingInteractions };
   }, [childThreadsSection, childPendingInteractions]);
-}
-
-interface UseSentMessageEditingArgs {
-  canStartEdit: boolean;
-  threadId: string;
-  timelineLoading: boolean;
-  timelineRows: readonly TimelineRow[];
-}
-
-function useSentMessageEditing({
-  canStartEdit,
-  threadId,
-  timelineLoading,
-  timelineRows,
-}: UseSentMessageEditingArgs) {
-  const editMessage = useEditThreadMessage();
-  const [sentMessageEditSession, setSentMessageEditSession] =
-    useState<SentMessageEditSession | null>(null);
-  const [sentMessageEditHostElement, setSentMessageEditHostElement] =
-    useState<HTMLDivElement | null>(null);
-  const activeSentMessageEditSession =
-    sentMessageEditSession?.threadId === threadId
-      ? sentMessageEditSession
-      : null;
-  const canEditSentMessages =
-    canStartEdit && sentMessageEditSession === null && !editMessage.isPending;
-  const handleEditSentMessage = useCallback<ThreadTimelineEditMessageHandler>(
-    (target: ThreadTimelineEditMessageTarget) => {
-      if (!canEditSentMessages) {
-        return;
-      }
-      setSentMessageEditHostElement(null);
-      setSentMessageEditSession({
-        draft: promptInputToDraft(target.input),
-        operationId: nanoid(),
-        target,
-        threadId,
-      });
-    },
-    [canEditSentMessages, threadId],
-  );
-  const sentMessageEditThreadId = sentMessageEditSession?.threadId ?? null;
-  const sentMessageEditTargetMessageId =
-    sentMessageEditSession?.target.messageId ?? null;
-  const sentMessageEditTargetStillPresent =
-    sentMessageEditThreadId === threadId &&
-    sentMessageEditTargetMessageId !== null
-      ? hasTimelineRowId(timelineRows, sentMessageEditTargetMessageId)
-      : true;
-  const shouldDiscardMissingSentMessageEdit =
-    sentMessageEditThreadId !== null &&
-    sentMessageEditThreadId === threadId &&
-    !timelineLoading &&
-    !sentMessageEditTargetStillPresent;
-  useEffect(() => {
-    if (!shouldDiscardMissingSentMessageEdit) {
-      return;
-    }
-    setSentMessageEditHostElement(null);
-    setSentMessageEditSession(null);
-    appToast.warning("The message being edited is no longer available.");
-  }, [shouldDiscardMissingSentMessageEdit]);
-  const activeSentMessageEditOperationId =
-    activeSentMessageEditSession?.operationId ?? null;
-  const updateSentMessageEditDraft = useCallback(
-    (update: (current: PromptDraftState) => PromptDraftState) => {
-      setSentMessageEditSession((current) =>
-        current?.operationId === activeSentMessageEditOperationId
-          ? { ...current, draft: update(current.draft) }
-          : current,
-      );
-    },
-    [activeSentMessageEditOperationId],
-  );
-  const closeSentMessageEdit = useCallback((operationId: string) => {
-    setSentMessageEditSession((current) =>
-      current?.operationId === operationId ? null : current,
-    );
-  }, []);
-  const cancelSentMessageEdit = useCallback(() => {
-    if (!activeSentMessageEditSession) {
-      return;
-    }
-    closeSentMessageEdit(activeSentMessageEditSession.operationId);
-  }, [activeSentMessageEditSession, closeSentMessageEdit]);
-  const submitSentMessageEdit = useCallback<
-    ThreadDetailSentMessageEdit["onSubmit"]
-  >(
-    (target) => {
-      if (!activeSentMessageEditSession) {
-        return;
-      }
-      const session = activeSentMessageEditSession;
-      const execution = target.execution;
-      void editMessage
-        .mutateAsync({
-          id: session.threadId,
-          operationId: session.operationId,
-          expectedRequestSequence: session.target.expectedRequestSequence,
-          input: target.input,
-          ...(execution
-            ? {
-                model: execution.model,
-                permissionMode: execution.permissionMode,
-                reasoningLevel: execution.reasoningLevel,
-                executionInputSources: execution.executionInputSources,
-                ...(execution.supportsServiceTier && execution.serviceTier
-                  ? { serviceTier: execution.serviceTier }
-                  : {}),
-              }
-            : {}),
-        })
-        .then(() => {
-          closeSentMessageEdit(session.operationId);
-        })
-        .catch((error) => {
-          showMutationErrorToast({
-            error,
-            fallbackMessage: "Failed to edit the message",
-            lifecycleOperation: "edit_message",
-          });
-        });
-    },
-    [activeSentMessageEditSession, closeSentMessageEdit, editMessage],
-  );
-  const activeSentMessageEditTargetMessageId =
-    activeSentMessageEditSession?.target.messageId ?? null;
-  const inlineMessageEditor = useMemo<
-    ThreadTimelineInlineMessageEditor | undefined
-  >(
-    () =>
-      activeSentMessageEditTargetMessageId !== null
-        ? {
-            messageId: activeSentMessageEditTargetMessageId,
-            onHostElementChange: setSentMessageEditHostElement,
-          }
-        : undefined,
-    [activeSentMessageEditTargetMessageId],
-  );
-  const sentMessageEdit = useMemo<ThreadDetailSentMessageEdit | undefined>(
-    () =>
-      activeSentMessageEditSession
-        ? {
-            draft: activeSentMessageEditSession.draft,
-            hostElement: sentMessageEditHostElement,
-            isSubmitting: editMessage.isPending,
-            operationId: activeSentMessageEditSession.operationId,
-            onCancel: cancelSentMessageEdit,
-            onSubmit: submitSentMessageEdit,
-            updateDraft: updateSentMessageEditDraft,
-          }
-        : undefined,
-    [
-      activeSentMessageEditSession,
-      cancelSentMessageEdit,
-      editMessage.isPending,
-      sentMessageEditHostElement,
-      submitSentMessageEdit,
-      updateSentMessageEditDraft,
-    ],
-  );
-  return {
-    handleEditSentMessage: canEditSentMessages
-      ? handleEditSentMessage
-      : undefined,
-    inlineMessageEditor,
-    sentMessageEdit,
-  };
 }
 
 function useComposerFocusRequestKey(

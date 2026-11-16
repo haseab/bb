@@ -947,6 +947,45 @@ describe("editThreadMessage", () => {
     });
   });
 
+  it("times out an unresponsive rewind without replacing the original history", async () => {
+    await withTestHarness(async (harness) => {
+      const { environment, thread } = seedEditableThread(harness);
+      const originalEvents = listEvents(harness.db, { threadId: thread.id });
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      try {
+        const editPromise = editThreadMessage(harness.deps, {
+          environment,
+          thread,
+          payload: {
+            operationId: "edit-op-preparation-timeout",
+            expectedRequestSequence: 7,
+            input: [{ type: "text", text: "Replacement", mentions: [] }],
+          },
+        });
+        const rejectedEdit = expect(editPromise).rejects.toMatchObject({
+          status: 504,
+          body: { code: "command_timeout" },
+        });
+        await vi.waitFor(() => {
+          expect(
+            listQueuedThreadCommands(
+              harness,
+              "thread.rewind.prepare",
+              thread.id,
+            ),
+          ).toHaveLength(1);
+        });
+        await vi.advanceTimersByTimeAsync(3 * 60_000);
+        await rejectedEdit;
+        expect(listEvents(harness.db, { threadId: thread.id })).toEqual(
+          originalEvents,
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   it("rejects grouped requests", async () => {
     await withTestHarness(async (harness) => {
       const { environment, thread } = seedEditableThread(harness);

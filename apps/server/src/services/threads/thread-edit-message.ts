@@ -48,10 +48,7 @@ import { resolveDispatchAuthor } from "./dispatch-author.js";
 import { resolvePermissionEscalation } from "./thread-runtime-config.js";
 import { requireReadyThreadEnvironment } from "./thread-turn-dispatch.js";
 import { ensureHostSessionReadyForWork } from "../hosts/host-lifecycle.js";
-import {
-  LIVE_DAEMON_COMMAND_TIMEOUT_MS,
-  runLiveHostCommand,
-} from "../hosts/live-command.js";
+import { runLiveHostCommand } from "../hosts/live-command.js";
 import { resolveMessageSenderThreadId } from "./thread-send.js";
 import { attemptDispatch } from "./dispatch-attempt.js";
 import {
@@ -134,6 +131,8 @@ function findCommittedOperation(
 }
 
 const EDIT_MESSAGE_STOP_TIMEOUT_MS = 60_000;
+const EDIT_MESSAGE_PREPARE_TIMEOUT_MS = 3 * 60_000;
+const EDIT_MESSAGE_DISCARD_TIMEOUT_MS = 10_000;
 
 function isMessageEditThreadQuiescent(thread: Pick<Thread, "status">): boolean {
   return thread.status === "idle" || thread.status === "error";
@@ -599,7 +598,7 @@ async function editAdmittedThreadMessage(
           sourceProviderThreadId: target.sourceProviderThreadId,
         }),
         hostId: readyEnvironment.hostId,
-        timeoutMs: LIVE_DAEMON_COMMAND_TIMEOUT_MS,
+        timeoutMs: EDIT_MESSAGE_PREPARE_TIMEOUT_MS,
       });
     stagedProviderThreadId = prepared.providerThreadId;
   }
@@ -618,7 +617,7 @@ async function editAdmittedThreadMessage(
                 leaseId: rewindLeaseId,
               },
               hostId: readyEnvironment.hostId,
-              timeoutMs: LIVE_DAEMON_COMMAND_TIMEOUT_MS,
+              timeoutMs: EDIT_MESSAGE_DISCARD_TIMEOUT_MS,
             });
           } catch (error) {
             deps.logger.warn(
