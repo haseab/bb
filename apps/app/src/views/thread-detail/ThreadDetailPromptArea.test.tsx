@@ -839,6 +839,34 @@ describe("ThreadDetailPromptArea", () => {
     expect(onCancel).toHaveBeenCalledTimes(2);
   });
 
+  it("shows submission progress and disables closing a pending sent-message edit", () => {
+    const hostElement = document.createElement("div");
+    document.body.append(hostElement);
+    const onCancel = vi.fn();
+    const onSubmit = vi.fn();
+    renderPromptArea({
+      sentMessageEdit: {
+        draft: { text: "Replacement", mentions: [], attachments: [] },
+        hostElement,
+        isSubmitting: true,
+        operationId: "pending-edit",
+        onCancel,
+        onSubmit,
+        updateDraft: vi.fn(),
+      },
+    });
+    const editor = within(hostElement);
+    expect(editor.getByText("Submitting edit…")).toBeDefined();
+    const close = editor.getByRole("button", {
+      name: "Stop editing sent message",
+    });
+    expect(close.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(close);
+    fireEvent.click(editor.getByRole("button", { name: "Submit composer" }));
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it.each([
     { status: "active", displayStatus: "active" },
     { status: "stopping", displayStatus: "stopping" },

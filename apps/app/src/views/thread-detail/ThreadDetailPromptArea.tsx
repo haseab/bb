@@ -2042,7 +2042,10 @@ export function ThreadDetailPromptArea({
     return createPortal(
       <InlineMessageEditorFrame
         cancelLabel="Stop editing sent message"
-        label="Editing message"
+        cancelDisabled={sentMessageEdit.isSubmitting}
+        label={
+          sentMessageEdit.isSubmitting ? "Submitting edit…" : "Editing message"
+        }
         onCancel={sentMessageEdit.onCancel}
         variant="cap"
       >
